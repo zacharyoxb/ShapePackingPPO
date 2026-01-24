@@ -13,7 +13,7 @@ from torchrl.objectives import ClipPPOLoss
 from tensordict import TensorDict
 from tensordict.nn import TensorDictModule, CompositeDistribution
 
-from model.actor_critic import PresentActorCritic
+from model.modules.actor_critic import PresentActorCritic
 from model.env import PresentEnv
 from model.ppo_config import PPOConfig
 
@@ -63,7 +63,8 @@ class PPO:
                 ("params", "rot_logits"),
                 ("params", "flip_logits"),
                 ("params", "x"),
-                ("params", "y")
+                ("params", "y"),
+                "value"
             ]
         )
         self.policy_module = ProbabilisticActor(
@@ -83,9 +84,9 @@ class PPO:
 
         # Value network
         self.value_module = ValueOperator(
-            module=self.actor_net,
+            module=td_module,
             in_keys=[
-                "grid", "presents", "present_count"
+                "value"
             ]
         )
 
@@ -129,3 +130,12 @@ class PPO:
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             self.optim, self.config.total_frames // self.config.frames_per_batch, 0.0
         )
+
+    def train(self):
+        """ Train the model. """
+
+    def save(self):
+        """ Save the model """
+
+    def run(self):
+        """ Run the model """
