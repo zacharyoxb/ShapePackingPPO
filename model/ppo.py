@@ -13,9 +13,9 @@ from torchrl.objectives import ClipPPOLoss
 from tensordict import TensorDict
 from tensordict.nn import TensorDictModule, CompositeDistribution
 
-from nn.actor_critic import PresentActorCritic
-from nn.env import PresentEnv
-from nn.ppo_config import PPOConfig
+from model.actor_critic import PresentActorCritic
+from model.env import PresentEnv
+from model.ppo_config import PPOConfig
 
 
 @dataclass
