@@ -16,21 +16,18 @@ from tensordict.nn.probabilistic import InteractionType, set_interaction_type
 from model.modules.actor import PresentActor
 from model.modules.critic import PresentCritic
 from model.env import PresentEnv
-from model.ppo_config import PPOConfig
+from model.config.ppo_config import PPOConfig
 
 
 class PPO:
-    """ Implementation of the PPO actor-critic network"""
+    """ Implementation of the PPO actor-critic network """
 
     def __init__(self, replay_buffer: ReplayBuffer, config=None, device=None):
-        # Device / environment setup
         self.device = device or (
             'cuda' if torch.cuda.is_available() else 'cpu')
-        self.env = PresentEnv().to(self.device)
-
-        # Set up network configuration
         self.config = config or PPOConfig()
 
+        self.env = PresentEnv().to(self.device)
         # Set up Actor and Critic
         self.actor_net = PresentActor().to(device)
 
@@ -53,11 +50,19 @@ class PPO:
             in_keys=["params"],
             distribution_class=CompositeDistribution,
             distribution_kwargs={
-                "present_idx": d.Categorical,
-                "rot": d.Categorical,
-                "flip": d.Bernoulli,
-                "x": d.SoftmaxTransform,
-                "y": d.SoftmaxTransform,
+                "distribution_map": {
+                    "present_idx": d.Categorical,
+                    "rot": d.Categorical,
+                    "flip": d.Bernoulli,
+                    "x": lambda loc, scale: d.TransformedDistribution(
+                        d.Normal(loc, scale),
+                        d.TanhTransform()
+                    ),
+                    "y": lambda loc, scale: d.TransformedDistribution(
+                        d.Normal(loc, scale),
+                        d.TanhTransform()
+                    ),
+                }
             },
             return_log_prob=True
         )
