@@ -1,4 +1,4 @@
-""" Policy implementation for use with my present packing environment. """
+""" Actor Policy implementation for use with my present packing environment. """
 from dataclasses import dataclass
 from tensordict import TensorDict
 from torch import nn
@@ -14,10 +14,9 @@ class Heads:
     y_head: nn.Sequential
     rot_head: nn.Sequential
     flip_head: nn.Sequential
-    critic_head: nn.Sequential
 
 
-class PresentActorCritic(nn.Module):
+class PresentActor(nn.Module):
     """ Policy nn for PresentEnv with spatial awareness """
 
     def __init__(self):
@@ -56,17 +55,8 @@ class PresentActorCritic(nn.Module):
             nn.Linear(64, 1)
         )
 
-        # Critic
-        critic_head = nn.Sequential(
-            nn.Linear(self.extractor.combined_features, 256),
-            nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Linear(128, 1)  # single value estimate
-        )
-
         self.heads = Heads(present_idx_head, x_head,
-                           y_head, rot_head, flip_head, critic_head)
+                           y_head, rot_head, flip_head)
 
     def forward(self, tensordict):
         """ Forward function for running of nn """
@@ -84,8 +74,6 @@ class PresentActorCritic(nn.Module):
         x_gauss = self.heads.x_head(all_features)
         y_gauss = self.heads.y_head(all_features)
 
-        state_value = self.heads.critic_head(all_features)
-
         # mask out unavailable presents from logits
         idx_mask = (present_count > 0).float()
         present_idx_logits = present_idx_logits + idx_mask.log()
@@ -96,5 +84,4 @@ class PresentActorCritic(nn.Module):
             "flip_logits": flip_logits,
             "x": x_gauss,
             "y": y_gauss,
-            "value": state_value
         }, batch_size=present_idx_logits.shape[0])
