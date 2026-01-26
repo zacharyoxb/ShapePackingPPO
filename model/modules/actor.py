@@ -72,7 +72,8 @@ class PresentActor(nn.Module):
     def forward(self, tensordict):
         """ Forward function for running of nn """
         # get present count for masking out impossible choices
-        present_count = tensordict.get("present_count").unsqueeze(0)
+        present_count = tensordict.get(
+            ("observation", "present_count")).unsqueeze(0)
 
         # get features
         all_features = self.extractor(tensordict)
@@ -92,9 +93,11 @@ class PresentActor(nn.Module):
         present_idx_logits = present_idx_logits + idx_mask.log()
 
         return TensorDict({
-            "present_idx_logits": present_idx_logits,
-            "rot_logits": rot_logits,
-            "flip_logits": flip_logits,
-            "x": torch.cat([x_loc, x_scale]),
-            "y": torch.cat([y_loc, y_scale]),
-        }, batch_size=present_idx_logits.shape[0], device=self.device)
+            "action": {
+                "present_idx_logits": present_idx_logits,
+                "rot_logits": rot_logits,
+                "flip_logits": flip_logits,
+                "x": torch.cat([x_loc, x_scale]),
+                "y": torch.cat([y_loc, y_scale]),
+            }
+        }, batch_size=torch.Size([]), device=self.device)

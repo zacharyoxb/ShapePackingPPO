@@ -48,9 +48,11 @@ class FeatureExtractor(nn.Module):
 
     def forward(self, tensordict):
         """ Module forward functions - gets data features """
-        grid = tensordict.get("grid").unsqueeze(0).unsqueeze(0)
-        presents = tensordict.get("presents").unsqueeze(0)
-        present_count = tensordict.get("present_count").unsqueeze(0)
+        grid = tensordict.get(("observation", "grid")
+                              ).unsqueeze(0).unsqueeze(0)
+        presents = tensordict.get(("observation", "presents")).unsqueeze(0)
+        present_count = tensordict.get(
+            ("observation", "present_count")).unsqueeze(0)
 
         all_features = torch.cat([
             self.grid_encoder(grid),

@@ -98,23 +98,26 @@ class PresentEnv(EnvBase):
 
         # Return as TensorDict with observation keys
         return TensorDict({
-            "grid": grid,
-            "presents": presents,
-            "present_count": present_count,
+            "observation": {
+                "grid": grid,
+                "presents": presents,
+                "present_count": present_count,
+            },
         }, batch_size=self.batch_size, device=self.device)
 
     def _step(self, tensordict: TensorDict) -> TensorDict:
         """ Execute one action - returns NEXT observation + reward + done """
         # Get current state and action
-        grid = tensordict.get("grid").clone()
-        presents = tensordict.get("presents")
-        present_count = tensordict.get("present_count").clone()
+        grid = tensordict.get(("observation", "grid")).clone()
+        presents = tensordict.get(("observation", "presents"))
+        present_count = tensordict.get(
+            ("observation", "present_count")).clone()
 
-        present_idx = int(tensordict.get(("action", "present_idx")))
+        present_idx = int(tensordict.get(("action", "present_idx_logits")))
         x = int(tensordict.get(("action", "x")))
         y = int(tensordict.get(("action", "y")))
-        rot = int(tensordict.get(("action", "rot")))
-        flip = tensordict.get(("action", "flip")).tolist()[0]
+        rot = int(tensordict.get(("action", "rot_logits")))
+        flip = tensordict.get(("action", "flip_logits")).tolist()[0]
 
         # Get present
         present = presents[present_idx]
@@ -129,9 +132,11 @@ class PresentEnv(EnvBase):
         grid_region = grid[y:y+3, x:x+3]
         if torch.any(present * grid_region > 0):
             return TensorDict({
-                "grid": grid,
-                "presents": presents,
-                "present_count": present_count,
+                "observation": {
+                    "grid": grid,
+                    "presents": presents,
+                    "present_count": present_count,
+                },
                 "reward": torch.tensor(-20, dtype=torch.float32),
                 "done": torch.tensor(True)
             }, batch_size=self.batch_size, device=self.device)
@@ -149,9 +154,11 @@ class PresentEnv(EnvBase):
             done = torch.tensor(True)
 
         return TensorDict({
-            "grid": grid,
-            "presents": presents,
-            "present_count": present_count,
+            "observation": {
+                "grid": grid,
+                "presents": presents,
+                "present_count": present_count,
+            },
             "reward": reward,
             "done": done
         }, batch_size=self.batch_size, device=self.device)
@@ -164,7 +171,8 @@ class PresentEnv(EnvBase):
         # Reset environment
         _data = self.reset()
 
-        policy_input = _data.select("grid", "presents", "present_count")
+        policy_input = _data.get("observation").select(
+            "grid", "presents", "present_count")
 
         # While present_count is not 0 OR steps are exceeded
         for i in range(max_steps):
