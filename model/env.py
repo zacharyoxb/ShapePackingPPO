@@ -4,7 +4,7 @@ import torch
 from tensordict import TensorDict
 
 from torchrl.data import (Bounded, Composite, Unbounded,
-                          UnboundedContinuous, Categorical)
+                          Categorical)
 from torchrl.envs import EnvBase
 
 MAX_PRESENT_IDX = 5
@@ -53,10 +53,15 @@ class PresentEnv(EnvBase):
         })
 
     def _make_spec(self):
+        # extract x y bounds from grid shape
+        grid = self.start_state.get("grid")
+        h, w = grid.shape
+
         # Observation spec: what the agent sees
         self.observation_spec = Composite({
             "observation": {
-                "grid": UnboundedContinuous(dtype=torch.float32, device=self.device),
+                "grid": Bounded(low=0, high=1, dtype=torch.float32, shape=grid.shape,
+                                device=self.device),
                 "presents": Bounded(low=0, high=1, shape=torch.Size([3, 3]),
                                     dtype=torch.float32, device=self.device),
                 "present_count": Unbounded(shape=torch.Size([6]), dtype=torch.float32,
@@ -71,8 +76,8 @@ class PresentEnv(EnvBase):
                 "rot": Bounded(low=0, high=MAX_ROT, shape=1,
                                dtype=torch.uint8),
                 "flip": Bounded(low=0, high=MAX_FLIP, shape=torch.Size([2]), dtype=torch.uint8),
-                "x": Unbounded(shape=1, dtype=torch.int64),
-                "y": Unbounded(shape=1, dtype=torch.int64)
+                "x": Bounded(low=1, high=w-2, shape=1, dtype=torch.int64),
+                "y": Bounded(low=1, high=h-2, shape=1, dtype=torch.int64)
             }
         })
 
