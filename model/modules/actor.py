@@ -101,7 +101,7 @@ class PresentActor(nn.Module):
                     "logits": rot_logits
                 },
                 "flip": {
-                    "logits", flip_logits
+                    "logits": flip_logits
                 },
                 "x": {
                     "loc": x_loc,

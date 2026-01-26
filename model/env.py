@@ -42,37 +42,38 @@ class PresentEnv(EnvBase):
         """ Gets just the action spec for policy initialisation. """
         # Action spec: what the agent can do
         return Composite({
-            "present_idx": Bounded(low=0, high=MAX_PRESENT_IDX, shape=1, dtype=torch.uint8),
-            "rot": Bounded(low=0, high=MAX_ROT, shape=1,
-                           dtype=torch.uint8),
-            "flip": Bounded(low=0, high=MAX_FLIP, shape=torch.Size([2]), dtype=torch.uint8),
-            "x": Unbounded(shape=1, dtype=torch.int64),
-            "y": Unbounded(shape=1, dtype=torch.int64)
+            "action": {
+                "present_idx": Bounded(low=0, high=MAX_PRESENT_IDX, shape=1, dtype=torch.uint8),
+                "rot": Bounded(low=0, high=MAX_ROT, shape=1,
+                               dtype=torch.uint8),
+                "flip": Bounded(low=0, high=MAX_FLIP, shape=torch.Size([2]), dtype=torch.uint8),
+                "x": Unbounded(shape=1, dtype=torch.int64),
+                "y": Unbounded(shape=1, dtype=torch.int64)
+            }
         })
 
     def _make_spec(self):
         # Observation spec: what the agent sees
         self.observation_spec = Composite({
-            "grid": UnboundedContinuous(dtype=torch.float32, device=self.device),
-            "presents": Bounded(low=0, high=1, shape=torch.Size([3, 3]),
-                                dtype=torch.float32, device=self.device),
-            "present_count": Unbounded(shape=torch.Size([6]), dtype=torch.float32,
-                                       device=self.device),
+            "observation": {
+                "grid": UnboundedContinuous(dtype=torch.float32, device=self.device),
+                "presents": Bounded(low=0, high=1, shape=torch.Size([3, 3]),
+                                    dtype=torch.float32, device=self.device),
+                "present_count": Unbounded(shape=torch.Size([6]), dtype=torch.float32,
+                                           device=self.device),
+            }
         })
 
         # Action spec: what the agent can do
         self.action_spec = Composite({
-            "present_idx": Bounded(low=0, high=MAX_PRESENT_IDX, shape=1, dtype=torch.uint8,
-                                   device=self.device),
-
-            "rot": Bounded(low=0, high=MAX_ROT, shape=1,
-                           dtype=torch.uint8, device=self.device),
-            "flip": Bounded(low=0, high=MAX_FLIP, shape=torch.Size([2]), dtype=torch.uint8,
-                            device=self.device),
-            "x": Unbounded(shape=1, dtype=torch.int64,
-                           device=self.device),
-            "y": Unbounded(shape=1, dtype=torch.int64,
-                           device=self.device),
+            "action": {
+                "present_idx": Bounded(low=0, high=MAX_PRESENT_IDX, shape=1, dtype=torch.uint8),
+                "rot": Bounded(low=0, high=MAX_ROT, shape=1,
+                               dtype=torch.uint8),
+                "flip": Bounded(low=0, high=MAX_FLIP, shape=torch.Size([2]), dtype=torch.uint8),
+                "x": Unbounded(shape=1, dtype=torch.int64),
+                "y": Unbounded(shape=1, dtype=torch.int64)
+            }
         })
 
         # Reward and done specs
@@ -114,9 +115,9 @@ class PresentEnv(EnvBase):
         present_count = tensordict.get(
             ("observation", "present_count")).clone()
 
-        present_idx = int(tensordict.get(("action", "present_idx_logits")))
-        rot = int(tensordict.get(("action", "rot_logits")))
-        flip = tensordict.get(("action", "flip_logits")).tolist()[0]
+        present_idx = int(tensordict.get(("action", "present_idx")))
+        rot = int(tensordict.get(("action", "rot")))
+        flip = tensordict.get(("action", "flip")).tolist()[0]
         x = int(tensordict.get(("action", "x")))
         y = int(tensordict.get(("action", "y")))
 

@@ -50,6 +50,13 @@ class PPO:
                     "flip": d.Bernoulli,
                     "x": d.Normal,
                     "y": d.Normal
+                },
+                "name_map": {
+                    "present_idx": ("action", "present_idx"),
+                    "rot": ("action", "rot"),
+                    "flip": ("action", "flip"),
+                    "x": ("action", "x"),
+                    "y": ("action", "y")
                 }
             },
             return_log_prob=True
