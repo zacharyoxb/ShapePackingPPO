@@ -165,12 +165,14 @@ class PresentEnv(EnvBase):
         grid[y:y+3, x:x+3] = torch.maximum(grid_region, present)
 
         # Base reward
-        reward = torch.tensor(2, dtype=torch.float32)
+        reward = torch.tensor(10, dtype=torch.float32)
 
         # Check if all shapes are placed
         done = torch.tensor(False)
         if torch.sum(present_count) == 0:
             done = torch.tensor(True)
+            # add extra reward
+            reward += 200
 
         return TensorDict({
             "observation": {
