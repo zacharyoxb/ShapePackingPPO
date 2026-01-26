@@ -135,8 +135,20 @@ class PresentEnv(EnvBase):
         if flip[1]:
             present = torch.flip(present, (0,))
 
-        # If collision, exit early
+        # If x and y are out of range, exit early
         grid_region = grid[y:y+3, x:x+3]
+        if grid_region.shape != present.shape:
+            return TensorDict({
+                "observation": {
+                    "grid": grid,
+                    "presents": presents,
+                    "present_count": present_count,
+                },
+                "reward": torch.tensor(-20, dtype=torch.float32),
+                "done": torch.tensor(True)
+            }, batch_size=self.batch_size, device=self.device)
+
+        # If collision, exit early
         if torch.any(present * grid_region > 0):
             return TensorDict({
                 "observation": {
