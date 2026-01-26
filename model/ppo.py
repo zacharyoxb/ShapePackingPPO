@@ -5,31 +5,32 @@ from collections import defaultdict
 import torch
 from tqdm import tqdm
 from torch import distributions as d
-from torchrl.data import ReplayBuffer
 from torchrl.modules import ProbabilisticActor, ValueOperator
 from torchrl.collectors import SyncDataCollector
 from torchrl.objectives.value import GAE
 from torchrl.objectives import ClipPPOLoss
 from tensordict.nn import TensorDictModule, CompositeDistribution
-from tensordict.nn.probabilistic import InteractionType, set_interaction_type
 
 from model.modules.actor import PresentActor
 from model.modules.critic import PresentCritic
 from model.env import PresentEnv
 from model.config.ppo_config import PPOConfig
+from data.reader import get_data_generator
 
 
 class PPO:
     """ Implementation of the PPO actor-critic network """
 
-    def __init__(self, replay_buffer: ReplayBuffer, config=None, device=None):
+    def __init__(self, config=None, device=None):
         self.device = device or (
-            'cuda' if torch.cuda.is_available() else 'cpu')
+            torch.device('cuda') if torch.cuda.is_available(
+            ) else torch.device('cpu')
+        )
         self.config = config or PPOConfig()
+        self.data_generator = get_data_generator(self.device, "testinput.txt")
 
-        self.env = PresentEnv().to(self.device)
         # Set up Actor and Critic
-        self.actor_net = PresentActor().to(device)
+        self.actor_net = PresentActor(self.device)
 
         td_policy_module = TensorDictModule(
             self.actor_net,
@@ -44,9 +45,10 @@ class PPO:
                 ("params", "y"),
             ]
         )
+
         self.policy_module = ProbabilisticActor(
             module=td_policy_module,
-            spec=self.env.action_spec,
+            spec=PresentEnv.get_action_spec(),
             in_keys=["params"],
             distribution_class=CompositeDistribution,
             distribution_kwargs={
@@ -67,7 +69,7 @@ class PPO:
             return_log_prob=True
         )
 
-        self.value_net = PresentCritic().to(device)
+        self.value_net = PresentCritic(self.device)
         td_value_module = TensorDictModule(
             self.value_net,
             in_keys=[
@@ -77,25 +79,13 @@ class PPO:
                 "value"
             ]
         )
+
         self.value_module = ValueOperator(
             module=td_value_module,
             in_keys=[
                 "value"
             ]
         )
-
-        # Collector
-        self.collector = SyncDataCollector(
-            self.env,
-            self.actor_net,
-            frames_per_batch=self.config.frames_per_batch,
-            total_frames=self.config.total_frames,
-            split_trajs=False,
-            device=self.device
-        )
-
-        # Data for model
-        self.replay_buffer = replay_buffer
 
         # Loss function config
         self.advantage_module = GAE(
@@ -131,76 +121,28 @@ class PPO:
         pbar = tqdm(total=self.config.total_frames)
         eval_str = ""
 
-        # We iterate over the collector until it reaches the total number of frames it was
-        # designed to collect:
-        for i, tensordict_data in enumerate(self.collector):
-            # we now have a batch of data to work with. Let's learn something from it.
-            for _ in range(self.config.num_epochs):
-                # We'll need an "advantage" signal to make PPO work.
-                # We re-compute it at each epoch as its value depends on the value
-                # network which is updated in the inner loop.
-                self.advantage_module(tensordict_data)
-                data_view = tensordict_data.reshape(-1)
-                self.replay_buffer.extend(data_view.cpu())
-                for _ in range(self.config.frames_per_batch // self.config.sub_batch_size):
-                    subdata = self.replay_buffer.sample(
-                        self.config.sub_batch_size)
-                    loss_vals = self.loss_module(subdata.to(self.device))
-                    loss_value = (
-                        loss_vals["loss_objective"]
-                        + loss_vals["loss_critic"]
-                        + loss_vals["loss_entropy"]
-                    )
+        # for every set of data in the generator
+        for td in self.data_generator:
+            # convert td to device we are using
+            # init the collector using td env params
+            def make_env(start_state=td) -> PresentEnv:
+                env = PresentEnv(start_state)
+                env.to(self.device)
+                return env
 
-                    # Optimization: backward, grad clipping and optimization step
-                    loss_value.backward()
-                    # this is not strictly mandatory but it's good practice to keep
-                    # your gradient norm bounded
-                    torch.nn.utils.clip_grad_norm_(
-                        self.loss_module.parameters(), self.config.max_grad_norm)
-                    self.optim.step()
-                    self.optim.zero_grad()
-
-            logs["reward"].append(
-                tensordict_data["next", "reward"].mean().item())
-            pbar.update(tensordict_data.numel())
-            cum_reward_str = (
-                f"average reward={logs['reward'][-1]: 4.4f} (init={logs['reward'][0]: 4.4f})"
+            collector = SyncDataCollector(
+                make_env,  # type: ignore
+                self.actor_net,
+                create_env_kwargs={"start_state": td},
+                frames_per_batch=self.config.frames_per_batch,
+                total_frames=self.config.total_frames,
+                split_trajs=True,
+                device=self.device,
             )
-            logs["step_count"].append(
-                tensordict_data["step_count"].max().item())
-            stepcount_str = f"step count (max): {logs['step_count'][-1]}"
-            logs["lr"].append(self.optim.param_groups[0]["lr"])
-            lr_str = f"lr policy: {logs['lr'][-1]: 4.4f}"
-            if i % 10 == 0:
-                # We evaluate the policy once every 10 batches of data.
-                # Evaluation is rather simple: execute the policy without exploration
-                # (take the expected value of the action distribution) for a given
-                # number of steps (1000, which is our ``env`` horizon).
-                # The ``rollout`` method of the ``env`` can take a policy as argument:
-                # it will then execute this policy at each step.
-                with set_interaction_type(InteractionType.DETERMINISTIC), torch.no_grad():
-                    # execute a rollout with the trained policy
-                    eval_rollout = self.env.rollout(1000, self.policy_module)
-                    logs["eval reward"].append(
-                        eval_rollout["next", "reward"].mean().item())
-                    logs["eval reward (sum)"].append(
-                        eval_rollout["next", "reward"].sum().item()
-                    )
-                    logs["eval step_count"].append(
-                        eval_rollout["step_count"].max().item())
-                    eval_str = (
-                        f"eval cumulative reward: {logs['eval reward (sum)'][-1]: 4.4f} "
-                        f"(init: {logs['eval reward (sum)'][0]: 4.4f}), "
-                        f"eval step-count: {logs['eval step_count'][-1]}"
-                    )
-                    del eval_rollout
-            pbar.set_description(
-                ", ".join([eval_str, cum_reward_str, stepcount_str, lr_str]))
 
-            # We're also using a learning rate scheduler. Like the gradient clipping,
-            # this is a nice-to-have but nothing necessary for PPO to work.
-            self.scheduler.step()
+            for i, tensordict_data in enumerate(collector):
+                for _ in range(self.config.num_epochs):
+                    test = 1 + 1
 
     def save(self):
         """ Save the model """

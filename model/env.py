@@ -17,12 +17,15 @@ class PresentEnv(EnvBase):
 
     def __init__(
             self,
+            start_state: TensorDict,
             batch_size=None,
             seed=None,
-            device="cpu"
+            device=None,
     ):
         if batch_size is None:
             batch_size = torch.Size([])
+
+        self.start_state = start_state
 
         super().__init__(device=device, batch_size=batch_size)
         self.batch_size = batch_size
@@ -33,6 +36,19 @@ class PresentEnv(EnvBase):
 
         self.set_seed(int(seed))
         self._make_spec()
+
+    @classmethod
+    def get_action_spec(cls):
+        """ Gets just the action spec for policy initialisation. """
+        # Action spec: what the agent can do
+        return Composite({
+            "present_idx": Bounded(low=0, high=MAX_PRESENT_IDX, shape=1, dtype=torch.uint8),
+            "x": Unbounded(shape=1, dtype=torch.int64),
+            "y": Unbounded(shape=1, dtype=torch.int64),
+            "rot": Bounded(low=0, high=MAX_ROT, shape=1,
+                           dtype=torch.uint8),
+            "flip": Bounded(low=0, high=MAX_FLIP, shape=torch.Size([2]), dtype=torch.uint8)
+        })
 
     def _make_spec(self):
         # Observation spec: what the agent sees
@@ -76,16 +92,9 @@ class PresentEnv(EnvBase):
     def _reset(self, tensordict, **kwargs) -> TensorDict:
         """ Initialize new episode - returns FIRST observation """
 
-        grid_size = tensordict.get("grid_size")
-        presents = tensordict.get("presents")
-        present_count = tensordict.get("present_count")
-
-        # zeros expects height first
-        w, h = grid_size
-
-        # Create initial grid state
-        grid = torch.zeros(
-            (int(h), int(w)), dtype=torch.float32, device=self.device)
+        grid = self.start_state.get("grid")
+        presents = self.start_state.get("presents")
+        present_count = self.start_state.get("present_count")
 
         # Return as TensorDict with observation keys
         return TensorDict({

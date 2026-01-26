@@ -22,49 +22,49 @@ class Heads:
 class PresentActor(nn.Module):
     """ Policy nn for PresentEnv with spatial awareness """
 
-    def __init__(self):
+    def __init__(self, device=torch.device("cpu")):
         super().__init__()
 
         self.flatten = nn.Flatten()
-
         self.extractor = FeatureExtractor()
+        self.device = device
 
         # Output distributions
         present_idx = nn.Sequential(
             nn.Linear(self.extractor.combined_features, 128),
             nn.ReLU(),
             nn.Linear(128, 6)  # 6 presents
-        )
+        ).to(self.device)
         x_loc = nn.Sequential(
             nn.Linear(self.extractor.combined_features, 64),
             nn.ReLU(),
             nn.Linear(64, 1)
-        )
+        ).to(self.device)
         x_scale = nn.Sequential(
             nn.Linear(self.extractor.combined_features, 64),
             nn.ReLU(),
             nn.Linear(64, 1)
-        )
+        ).to(self.device)
         y_loc = nn.Sequential(
             nn.Linear(self.extractor.combined_features, 64),
             nn.ReLU(),
             nn.Linear(64, 1)
-        )
+        ).to(self.device)
         y_scale = nn.Sequential(
             nn.Linear(self.extractor.combined_features, 64),
             nn.ReLU(),
             nn.Linear(64, 1)
-        )
+        ).to(self.device)
         rot = nn.Sequential(
             nn.Linear(self.extractor.combined_features, 128),
             nn.ReLU(),
             nn.Linear(128, 4)  # 4 rotations
-        )
+        ).to(self.device)
         flip = nn.Sequential(
             nn.Linear(self.extractor.combined_features, 128),
             nn.ReLU(),
             nn.Linear(128, 2)  # 2 binary decisions
-        )
+        ).to(self.device)
 
         self.heads = Heads(present_idx, x_loc, x_scale,
                            y_loc, y_scale, rot, flip)
@@ -97,4 +97,4 @@ class PresentActor(nn.Module):
             "flip_logits": flip_logits,
             "x": torch.cat([x_loc, x_scale]),
             "y": torch.cat([y_loc, y_scale]),
-        }, batch_size=present_idx_logits.shape[0])
+        }, batch_size=present_idx_logits.shape[0], device=self.device)

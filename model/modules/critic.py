@@ -1,6 +1,7 @@
 """ Critic Policy implementation for use with my present packing environment. """
 from tensordict import TensorDict
 from torch import nn
+import torch
 
 from model.modules.feature_extractor import FeatureExtractor
 
@@ -8,12 +9,12 @@ from model.modules.feature_extractor import FeatureExtractor
 class PresentCritic(nn.Module):
     """ Critic for PPO """
 
-    def __init__(self):
+    def __init__(self, device=torch.device("cpu")):
         super().__init__()
 
         self.flatten = nn.Flatten()
-
         self.extractor = FeatureExtractor()
+        self.device = device
 
         self.critic_head = nn.Sequential(
             nn.Linear(self.extractor.combined_features, 256),
@@ -21,7 +22,7 @@ class PresentCritic(nn.Module):
             nn.Linear(256, 128),
             nn.ReLU(),
             nn.Linear(128, 1)
-        )
+        ).to(device)
 
     def forward(self, tensordict):
         """ Forward function for running of nn """
@@ -33,4 +34,4 @@ class PresentCritic(nn.Module):
 
         return TensorDict({
             "value": value
-        }, batch_size=value.shape[0])
+        }, batch_size=value.shape[0], device=self.device)

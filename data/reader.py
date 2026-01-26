@@ -1,10 +1,10 @@
 """ Reads data from text """
 
 import re
+from typing import Generator
 
 from tensordict import TensorDict
 import torch
-from torchrl.data import ReplayBuffer, LazyTensorStorage
 
 
 def _get_presents(file_name) -> torch.Tensor:
@@ -53,25 +53,15 @@ def _get_placement_info(file_name="input.txt") -> list[tuple[int, int, torch.Ten
     return args
 
 
-def get_data(file_name="input.txt") -> ReplayBuffer:
-    """ Collates all data into a replay buffer """
+def get_data_generator(device, file_name="input.txt") -> Generator[TensorDict, None, None]:
+    """ Collates all data into a dataset """
     presents = _get_presents(file_name)
     placement_info = _get_placement_info(file_name)
 
-    # Create buffer with LazyTensorStorage to handle different sizes
-    buffer = ReplayBuffer(
-        storage=LazyTensorStorage(max_size=len(
-            placement_info) * 1000),  # Estimate capacity
-        batch_size=32
-    )
-
     for grid_width, grid_height, present_count in placement_info:
         params = TensorDict({
-            "grid_size": torch.tensor([grid_width, grid_height], dtype=torch.float32),
+            "grid": torch.zeros((grid_height, grid_width), dtype=torch.float32),
             "presents": presents.clone(),
             "present_count": present_count.clone(),
-        }, batch_size=[])
-
-        buffer.add(params)
-
-    return buffer
+        }, batch_size=[], device=device)
+        yield params
