@@ -35,15 +35,7 @@ class PPO:
         td_policy_module = TensorDictModule(
             self.actor_net,
             in_keys=["observation"],
-            out_keys=[
-                ("params", "present_idx_logits", "logits"),
-                ("params", "rot_logits", "logits"),
-                ("params", "flip_logits", "logits"),
-                ("params", "x", "loc"),
-                ("params", "x", "scale"),
-                ("params", "y", "loc"),
-                ("params", "y", "scale")
-            ]
+            out_keys=["params"]
         )
 
         self.policy_module = ProbabilisticActor(

@@ -43,11 +43,11 @@ class PresentEnv(EnvBase):
         # Action spec: what the agent can do
         return Composite({
             "present_idx": Bounded(low=0, high=MAX_PRESENT_IDX, shape=1, dtype=torch.uint8),
-            "x": Unbounded(shape=1, dtype=torch.int64),
-            "y": Unbounded(shape=1, dtype=torch.int64),
             "rot": Bounded(low=0, high=MAX_ROT, shape=1,
                            dtype=torch.uint8),
-            "flip": Bounded(low=0, high=MAX_FLIP, shape=torch.Size([2]), dtype=torch.uint8)
+            "flip": Bounded(low=0, high=MAX_FLIP, shape=torch.Size([2]), dtype=torch.uint8),
+            "x": Unbounded(shape=1, dtype=torch.int64),
+            "y": Unbounded(shape=1, dtype=torch.int64)
         })
 
     def _make_spec(self):
@@ -64,14 +64,15 @@ class PresentEnv(EnvBase):
         self.action_spec = Composite({
             "present_idx": Bounded(low=0, high=MAX_PRESENT_IDX, shape=1, dtype=torch.uint8,
                                    device=self.device),
+
+            "rot": Bounded(low=0, high=MAX_ROT, shape=1,
+                           dtype=torch.uint8, device=self.device),
+            "flip": Bounded(low=0, high=MAX_FLIP, shape=torch.Size([2]), dtype=torch.uint8,
+                            device=self.device),
             "x": Unbounded(shape=1, dtype=torch.int64,
                            device=self.device),
             "y": Unbounded(shape=1, dtype=torch.int64,
                            device=self.device),
-            "rot": Bounded(low=0, high=MAX_ROT, shape=1,
-                           dtype=torch.uint8, device=self.device),
-            "flip": Bounded(low=0, high=MAX_FLIP, shape=torch.Size([2]), dtype=torch.uint8,
-                            device=self.device)
         })
 
         # Reward and done specs
@@ -114,10 +115,10 @@ class PresentEnv(EnvBase):
             ("observation", "present_count")).clone()
 
         present_idx = int(tensordict.get(("action", "present_idx_logits")))
-        x = int(tensordict.get(("action", "x")))
-        y = int(tensordict.get(("action", "y")))
         rot = int(tensordict.get(("action", "rot_logits")))
         flip = tensordict.get(("action", "flip_logits")).tolist()[0]
+        x = int(tensordict.get(("action", "x")))
+        y = int(tensordict.get(("action", "y")))
 
         # Get present
         present = presents[present_idx]
