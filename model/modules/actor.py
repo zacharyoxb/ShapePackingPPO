@@ -94,10 +94,21 @@ class PresentActor(nn.Module):
 
         return TensorDict({
             "params": {
-                "present_idx_logits": {"logits": present_idx_logits},
-                "rot_logits": {"logits": rot_logits},
-                "flip_logits": {"logits", flip_logits},
-                "x_params": {"loc": x_loc, "scale": x_scale},
-                "y_params": {"loc": y_loc, "scale": y_scale},
+                "present_idx": {
+                    "logits": present_idx_logits
+                },
+                "rot": {
+                    "logits": rot_logits
+                },
+                "flip": {
+                    "logits", flip_logits
+                },
+                "x": {
+                    "loc": x_loc,
+                    "scale": x_scale
+                },
+                "y": {
+                    "loc": y_loc,
+                    "scale": y_scale},
             },
         }, batch_size=torch.Size([]), device=self.device)

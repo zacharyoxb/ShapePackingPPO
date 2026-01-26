@@ -39,10 +39,10 @@ class PPO:
                 ("params", "present_idx_logits", "logits"),
                 ("params", "rot_logits", "logits"),
                 ("params", "flip_logits", "logits"),
-                ("params", "x_params", "loc"),
-                ("params", "x_params", "scale"),
-                ("params", "y_params", "loc"),
-                ("params", "y_params", "scale"),
+                ("params", "x", "loc"),
+                ("params", "x", "scale"),
+                ("params", "y", "loc"),
+                ("params", "y", "scale")
             ]
         )
 
@@ -66,19 +66,13 @@ class PPO:
         self.value_net = PresentCritic(self.device)
         td_value_module = TensorDictModule(
             self.value_net,
-            in_keys=[
-                "observation"
-            ],
-            out_keys=[
-                "value"
-            ]
+            in_keys=["observation"],
+            out_keys=["value"]
         )
 
         self.value_module = ValueOperator(
             module=td_value_module,
-            in_keys=[
-                "value"
-            ]
+            in_keys=["value"]
         )
 
         # Loss function config
