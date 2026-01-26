@@ -34,15 +34,15 @@ class PPO:
 
         td_policy_module = TensorDictModule(
             self.actor_net,
-            in_keys=[
-                "grid", "presents", "present_count"
-            ],
+            in_keys=["observation"],
             out_keys=[
-                ("params", "present_idx_logits"),
-                ("params", "rot_logits"),
-                ("params", "flip_logits"),
-                ("params", "x"),
-                ("params", "y"),
+                ("params", "present_idx_logits", "logits"),
+                ("params", "rot_logits", "logits"),
+                ("params", "flip_logits", "logits"),
+                ("params", "x_params", "loc"),
+                ("params", "x_params", "scale"),
+                ("params", "y_params", "loc"),
+                ("params", "y_params", "scale"),
             ]
         )
 
@@ -56,14 +56,8 @@ class PPO:
                     "present_idx": d.Categorical,
                     "rot": d.Categorical,
                     "flip": d.Bernoulli,
-                    "x": lambda loc, scale: d.TransformedDistribution(
-                        d.Normal(loc, scale),
-                        d.TanhTransform()
-                    ),
-                    "y": lambda loc, scale: d.TransformedDistribution(
-                        d.Normal(loc, scale),
-                        d.TanhTransform()
-                    ),
+                    "x": d.Normal,
+                    "y": d.Normal
                 }
             },
             return_log_prob=True
@@ -73,7 +67,7 @@ class PPO:
         td_value_module = TensorDictModule(
             self.value_net,
             in_keys=[
-                "grid", "presents", "present_count"
+                "observation"
             ],
             out_keys=[
                 "value"
@@ -132,7 +126,7 @@ class PPO:
 
             collector = SyncDataCollector(
                 make_env,  # type: ignore
-                self.actor_net,
+                self.policy_module,
                 create_env_kwargs={"start_state": td},
                 frames_per_batch=self.config.frames_per_batch,
                 total_frames=self.config.total_frames,

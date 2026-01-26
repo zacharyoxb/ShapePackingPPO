@@ -73,7 +73,7 @@ class PresentActor(nn.Module):
         """ Forward function for running of nn """
         # get present count for masking out impossible choices
         present_count = tensordict.get(
-            ("observation", "present_count")).unsqueeze(0)
+            "present_count").unsqueeze(0)
 
         # get features
         all_features = self.extractor(tensordict)
@@ -84,20 +84,20 @@ class PresentActor(nn.Module):
         flip_logits = self.heads.flip(all_features)
 
         x_loc = self.heads.x_loc(all_features)
-        x_scale = self.heads.x_scale(all_features)
+        x_scale = torch.exp(self.heads.x_scale(all_features))
         y_loc = self.heads.y_loc(all_features)
-        y_scale = self.heads.y_scale(all_features)
+        y_scale = torch.exp(self.heads.y_scale(all_features))
 
         # mask out unavailable presents from logits
         idx_mask = (present_count > 0).float()
         present_idx_logits = present_idx_logits + idx_mask.log()
 
         return TensorDict({
-            "action": {
-                "present_idx_logits": present_idx_logits,
-                "rot_logits": rot_logits,
-                "flip_logits": flip_logits,
-                "x": torch.cat([x_loc, x_scale]),
-                "y": torch.cat([y_loc, y_scale]),
-            }
+            "params": {
+                "present_idx_logits": {"logits": present_idx_logits},
+                "rot_logits": {"logits": rot_logits},
+                "flip_logits": {"logits", flip_logits},
+                "x_params": {"loc": x_loc, "scale": x_scale},
+                "y_params": {"loc": y_loc, "scale": y_scale},
+            },
         }, batch_size=torch.Size([]), device=self.device)
