@@ -11,12 +11,12 @@ from model.modules.feature_extractor import FeatureExtractor
 class Heads:
     """ Holds all model heads """
     present_idx: nn.Sequential
+    rot: nn.Sequential
+    flip: nn.Sequential
     x_loc: nn.Sequential
     x_scale: nn.Sequential
     y_loc: nn.Sequential
     y_scale: nn.Sequential
-    rot: nn.Sequential
-    flip: nn.Sequential
 
 
 class PresentActor(nn.Module):
@@ -34,6 +34,16 @@ class PresentActor(nn.Module):
             nn.Linear(self.extractor.combined_features, 128),
             nn.ReLU(),
             nn.Linear(128, 6)  # 6 presents
+        ).to(self.device)
+        rot = nn.Sequential(
+            nn.Linear(self.extractor.combined_features, 128),
+            nn.ReLU(),
+            nn.Linear(128, 4)  # 4 rotations
+        ).to(self.device)
+        flip = nn.Sequential(
+            nn.Linear(self.extractor.combined_features, 128),
+            nn.ReLU(),
+            nn.Linear(128, 2)  # 2 binary decisions
         ).to(self.device)
         x_loc = nn.Sequential(
             nn.Linear(self.extractor.combined_features, 64),
@@ -55,25 +65,14 @@ class PresentActor(nn.Module):
             nn.ReLU(),
             nn.Linear(64, 1)
         ).to(self.device)
-        rot = nn.Sequential(
-            nn.Linear(self.extractor.combined_features, 128),
-            nn.ReLU(),
-            nn.Linear(128, 4)  # 4 rotations
-        ).to(self.device)
-        flip = nn.Sequential(
-            nn.Linear(self.extractor.combined_features, 128),
-            nn.ReLU(),
-            nn.Linear(128, 2)  # 2 binary decisions
-        ).to(self.device)
 
-        self.heads = Heads(present_idx, x_loc, x_scale,
-                           y_loc, y_scale, rot, flip)
+        self.heads = Heads(present_idx, rot, flip, x_loc,
+                           x_scale, y_loc, y_scale)
 
     def forward(self, tensordict):
         """ Forward function for running of nn """
         # get present count for masking out impossible choices
-        present_count = tensordict.get(
-            "present_count").unsqueeze(0)
+        present_count = tensordict.get("present_count").unsqueeze(0)
 
         # get features
         all_features = self.extractor(tensordict)

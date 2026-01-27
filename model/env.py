@@ -195,7 +195,7 @@ class PresentEnv(EnvBase):
         policy_input = _data.get("observation").select(
             "grid", "presents", "present_count")
 
-        # While present_count is not 0 OR steps are exceeded
+        # While present_count more than 0 and steps not exceeded
         for i in range(max_steps):
             # Compute an action given a policy
             if policy:
