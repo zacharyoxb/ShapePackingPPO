@@ -36,7 +36,6 @@ class PPO:
 
         # Set up Actor and Critic
         self.actor_net = PresentActor(self.device)
-
         td_policy_module = TensorDictModule(
             self.actor_net,
             in_keys=["observation"],
@@ -68,15 +67,9 @@ class PPO:
         )
 
         self.value_net = PresentCritic(self.device)
-        td_value_module = TensorDictModule(
-            self.value_net,
-            in_keys=["observation"],
-            out_keys=["value"]
-        )
-
         self.value_module = ValueOperator(
-            module=td_value_module,
-            in_keys=["value"]
+            module=self.value_net,
+            in_keys=["observation"]
         )
 
         # Loss function config

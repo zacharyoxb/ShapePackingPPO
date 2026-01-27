@@ -9,14 +9,16 @@ class FeatureExtractor(nn.Module):
     def __init__(self):
         super().__init__()
 
-        # Process grid
+        # Process grid of [batch, channels, height, width]
         self.grid_encoder = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(2),
+
             nn.Conv2d(16, 32, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(2),
+
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.AdaptiveAvgPool2d((1, 1)),
@@ -24,33 +26,34 @@ class FeatureExtractor(nn.Module):
             nn.Linear(64, 128)
         )
 
-        # Process present
+        # Process grid of [batch, channels, height, width]
         self.present_encoder = nn.Sequential(
-            nn.Linear(6 * 3 * 3, 512),
+            nn.Conv2d(1, 16, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Linear(512, 256),
+            nn.Conv2d(16, 32, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU()
+            nn.Flatten(),
+            nn.Linear(32 * 3 * 3, 128)  # 32 channels × 3×3 spatial
         )
 
-        # Process present_count
+        # Present count encoder (simple scalar)
         self.present_count_encoder = nn.Sequential(
-            nn.Linear(6, 128),
+            nn.Linear(1, 64),
             nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, 32),
-            nn.ReLU()
+            nn.Linear(64, 32)
         )
 
         self.combined_features = 128 + 128 + 32
 
     def forward(self, tensordict):
         """ Module forward functions - gets data features """
-        grid = tensordict.get("grid").unsqueeze(0).unsqueeze(0)
-        presents = tensordict.get("presents").unsqueeze(0)
-        present_count = tensordict.get("present_count").unsqueeze(0)
+        grid = tensordict.get("grid").clone()
+        presents = tensordict.get("presents").clone()
+        present_count = tensordict.get("present_count").clone()
+
+        grid = grid.unsqueeze(0).unsqueeze(0)
+        presents = presents.unsqueeze(0)
+        present_count.unsqueeze(0)
 
         all_features = torch.cat([
             self.grid_encoder(grid),

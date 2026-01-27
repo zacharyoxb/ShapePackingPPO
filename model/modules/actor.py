@@ -72,7 +72,8 @@ class PresentActor(nn.Module):
     def forward(self, tensordict):
         """ Forward function for running of nn """
         # get present count for masking out impossible choices
-        present_count = tensordict.get("present_count").unsqueeze(0)
+        present_count = tensordict.get("present_count").clone()
+        present_count = present_count.unsqueeze(0)
 
         # get features
         all_features = self.extractor(tensordict)
