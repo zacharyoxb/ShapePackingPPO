@@ -5,7 +5,7 @@ from collections import defaultdict
 import torch
 from tqdm import tqdm
 from torch import distributions as d
-from torchrl.modules import ProbabilisticActor, ValueOperator
+from torchrl.modules import ProbabilisticActor
 from torchrl.collectors import SyncDataCollector
 from torchrl.objectives.value import GAE
 from torchrl.objectives import ClipPPOLoss
@@ -67,9 +67,10 @@ class PPO:
         )
 
         self.value_net = PresentCritic(self.device)
-        self.value_module = ValueOperator(
+        self.value_module = TensorDictModule(
             module=self.value_net,
-            in_keys=["observation"]
+            in_keys=["observation"],
+            out_keys=["state_value"]
         )
 
         # Loss function config
@@ -102,6 +103,7 @@ class PPO:
 
     def train(self):
         """ Train the model """
+
         logs = defaultdict(list)
         pbar = tqdm(total=self.config.total_frames)
         eval_str = ""
@@ -118,10 +120,9 @@ class PPO:
             collector = SyncDataCollector(
                 make_env,  # type: ignore
                 self.policy_module,
-                create_env_kwargs={"start_state": td},
                 frames_per_batch=self.config.frames_per_batch,
                 total_frames=self.config.total_frames,
-                split_trajs=True,
+                create_env_kwargs={"start_state": td},
                 device=self.device,
             )
 

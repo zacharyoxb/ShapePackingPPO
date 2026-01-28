@@ -6,10 +6,12 @@ import torch
 class FeatureExtractor(nn.Module):
     """ Outputs tensor representing extracted features """
 
-    def __init__(self):
+    def __init__(self, device):
         super().__init__()
 
-        # Process grid of [batch, channels, height, width]
+        self.device = device
+
+        # Encodes grid
         self.grid_encoder = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=3, padding=1),
             nn.ReLU(),
@@ -23,27 +25,35 @@ class FeatureExtractor(nn.Module):
             nn.ReLU(),
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
-            nn.Linear(64, 128)
-        )
+            nn.Linear(64, 128)  # [batch, 128]
+        ).to(device)
 
-        # Process grid of [batch, channels, height, width]
-        self.present_encoder = nn.Sequential(
-            nn.Conv2d(1, 16, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(16, 32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Flatten(),
-            nn.Linear(32 * 3 * 3, 128)  # 32 channels × 3×3 spatial
-        )
+        # Encodes each present individually
+        self.present_encoders = nn.ModuleList(
+            nn.Sequential(
+                nn.Conv2d(1, 16, kernel_size=1),
+                nn.ReLU(),
+                nn.AdaptiveAvgPool2d(1),
+                nn.Flatten()  # [batch, 16]
+            ) for _ in range(6)
+        ).to(device)
 
-        # Present count encoder (simple scalar)
         self.present_count_encoder = nn.Sequential(
-            nn.Linear(6, 64),
+            nn.Linear(6, 32),
             nn.ReLU(),
-            nn.Linear(64, 32)
-        )
+            nn.Linear(32, 16),
+            nn.ReLU()
+        ).to(device)  # [batch, 16]
 
-        self.combined_features = 128 + 128 + 32
+        combined_features = 128 + (16 * 6) + 16
+
+        self.fusion = nn.Sequential(
+            nn.Linear(combined_features, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128)  # [batch, 128]
+        ).to(device)
+
+        self.features = 128
 
     def forward(self, tensordict):
         """ Module forward functions - gets data features """
@@ -52,33 +62,33 @@ class FeatureExtractor(nn.Module):
         presents = tensordict.get("presents").detach().clone()
         present_count = tensordict.get("present_count").detach().clone()
 
-        # Process grid: ensure [batch, 1, height, width]
-        grid_features = self._process_grid(grid)
+        # Check if batch (and channel, if using conv2d) dimensions exist
+        if grid.dim() < 3:
+            grid = grid.unsqueeze(0).unsqueeze(0)
+        else:
+            grid = grid.unsqueeze(1)
 
-        # Process presents: handle 6 presents in parallel
-        present_features = self._process_multiple_presents(presents)
-        # Aggregate so batch size matches others
-        present_features = present_features.mean(dim=0, keepdim=True)
+        if presents.dim() < 4:
+            presents = presents.unsqueeze(0)
 
-        # Process present count: ensure [batch, 1]
-        count_features = self._process_present_count(present_count)
+        if present_count.dim() < 2:
+            present_count = present_count.unsqueeze(0)
 
-        all_features = torch.cat([
-            grid_features,
-            present_features,
-            count_features
-        ], dim=1)
+        # Extract grid/present_count features
+        grid_features = self.grid_encoder(grid)
+        all_features = grid_features
 
-        return all_features
+        # Encode each present with its own encoder
+        for i, encoder in enumerate(self.present_encoders):
+            # [batch, present_idx, height, width] -> add channel dim
+            present = presents[:, i, :, :].unsqueeze(1)
+            encoded_present = encoder(present)
+            all_features = torch.cat([all_features, encoded_present], dim=1)
 
-    def _process_grid(self, grid):
-        grid = grid.unsqueeze(0).unsqueeze(0)  # [1, 1, height, width]
-        return self.grid_encoder(grid)
+        count_features = self.present_count_encoder(present_count)
+        all_features = torch.cat([all_features, count_features], dim=1)
 
-    def _process_multiple_presents(self, presents):
-        presents = presents.unsqueeze(1)  # [6, 3, 3] -> [6, 1, 3, 3]
-        return self.present_encoder(presents)
+        # Combine all features
+        fused_features = self.fusion(all_features)
 
-    def _process_present_count(self, count):
-        count = count.unsqueeze(0)  # [batch, 1]
-        return self.present_count_encoder(count)
+        return fused_features

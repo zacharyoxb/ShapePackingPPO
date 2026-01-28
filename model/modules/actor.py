@@ -26,42 +26,42 @@ class PresentActor(nn.Module):
         super().__init__()
 
         self.flatten = nn.Flatten()
-        self.extractor = FeatureExtractor()
+        self.extractor = FeatureExtractor(device)
         self.device = device
 
         # Output distributions
         present_idx = nn.Sequential(
-            nn.Linear(self.extractor.combined_features, 128),
+            nn.Linear(self.extractor.features, 128),
             nn.ReLU(),
             nn.Linear(128, 6)  # 6 presents
         ).to(self.device)
         rot = nn.Sequential(
-            nn.Linear(self.extractor.combined_features, 128),
+            nn.Linear(self.extractor.features, 128),
             nn.ReLU(),
             nn.Linear(128, 4)  # 4 rotations
         ).to(self.device)
         flip = nn.Sequential(
-            nn.Linear(self.extractor.combined_features, 128),
+            nn.Linear(self.extractor.features, 128),
             nn.ReLU(),
             nn.Linear(128, 2)  # 2 binary decisions
         ).to(self.device)
         x_loc = nn.Sequential(
-            nn.Linear(self.extractor.combined_features, 64),
+            nn.Linear(self.extractor.features, 64),
             nn.ReLU(),
             nn.Linear(64, 1)
         ).to(self.device)
         x_scale = nn.Sequential(
-            nn.Linear(self.extractor.combined_features, 64),
+            nn.Linear(self.extractor.features, 64),
             nn.ReLU(),
             nn.Linear(64, 1)
         ).to(self.device)
         y_loc = nn.Sequential(
-            nn.Linear(self.extractor.combined_features, 64),
+            nn.Linear(self.extractor.features, 64),
             nn.ReLU(),
             nn.Linear(64, 1)
         ).to(self.device)
         y_scale = nn.Sequential(
-            nn.Linear(self.extractor.combined_features, 64),
+            nn.Linear(self.extractor.features, 64),
             nn.ReLU(),
             nn.Linear(64, 1)
         ).to(self.device)

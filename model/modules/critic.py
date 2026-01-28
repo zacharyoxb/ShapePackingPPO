@@ -13,11 +13,11 @@ class PresentCritic(nn.Module):
         super().__init__()
 
         self.flatten = nn.Flatten()
-        self.extractor = FeatureExtractor()
+        self.extractor = FeatureExtractor(device)
         self.device = device
 
         self.critic_head = nn.Sequential(
-            nn.Linear(self.extractor.combined_features, 256),
+            nn.Linear(self.extractor.features, 256),
             nn.ReLU(),
             nn.Linear(256, 128),
             nn.ReLU(),
