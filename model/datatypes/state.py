@@ -1,3 +1,4 @@
+""" Datatype to hold state tensors """
 from dataclasses import dataclass
 
 from tensordict import TensorDict

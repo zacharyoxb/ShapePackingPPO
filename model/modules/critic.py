@@ -33,5 +33,5 @@ class PresentCritic(nn.Module):
         value = self.critic_head(all_features)
 
         return TensorDict({
-            "value": value
+            "state_value": value
         }, batch_size=value.shape[0], device=self.device)

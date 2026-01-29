@@ -111,4 +111,4 @@ class PresentActor(nn.Module):
                     "loc": y_loc,
                     "scale": y_scale},
             },
-        }, batch_size=torch.Size([]), device=self.device)
+        }, device=self.device)
