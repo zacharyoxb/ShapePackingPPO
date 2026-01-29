@@ -159,12 +159,14 @@ class PresentEnv(EnvBase):
 
     def _step(self, tensordict: TensorDict) -> TensorDict:
         """ Execute one action - returns NEXT observation + reward + done """
-        states = state.from_tensordict(tensordict)
-        actions = action.from_tensordict(tensordict)
-
         # Process everything in one loop
-        results = [self._handle_batch(b_state, b_action)
-                   for b_state, b_action in zip(states, actions)]
+        results = [
+            self._handle_batch(b_state, b_action)
+            for b_state, b_action in zip(
+                state.from_tensordict(tensordict),
+                action.from_tensordict(tensordict)
+            )
+        ]
 
         # Unzip results
         grids, presents_list, present_counts, rewards, dones = zip(
@@ -172,18 +174,14 @@ class PresentEnv(EnvBase):
 
         # If batched, stack results
         batch_size = tensordict.batch_size[0] if tensordict.batch_size else 1
-        if batch_size > 1:
-            grid = torch.stack(grids)
-            presents = torch.stack(presents_list)
-            present_count = torch.stack(present_counts)
-            reward = torch.stack(rewards)
-            done = torch.stack(dones)
-        else:
-            grid = grids[0]
-            presents = presents_list[0]
-            present_count = present_counts[0]
-            reward = rewards[0]
-            done = dones[0]
+
+        grid = torch.stack(grids) if batch_size > 1 else grids[0]
+        presents = torch.stack(
+            presents_list) if batch_size > 1 else presents_list[0]
+        present_count = torch.stack(
+            present_counts) if batch_size > 1 else present_counts[0]
+        reward = torch.stack(rewards) if batch_size > 1 else rewards[0]
+        done = torch.stack(dones) if batch_size > 1 else dones[0]
 
         return TensorDict({
             "observation": {
