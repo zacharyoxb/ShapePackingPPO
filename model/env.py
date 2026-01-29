@@ -125,8 +125,7 @@ class PresentEnv(EnvBase):
             done = torch.tensor(True)
             return batch_state.grid, batch_state.presents, batch_state.present_count, reward, done
 
-        present = batch_state.presents[batch_action.present_idx].clone(
-        )
+        present = batch_state.presents[batch_action.present_idx].clone()
         present = torch.rot90(present, batch_action.rot)
 
         if batch_action.flip[0]:
@@ -138,7 +137,7 @@ class PresentEnv(EnvBase):
         x, y = round(float(batch_action.x)), round(float(batch_action.y))
 
         # collision check
-        grid_region = batch_state.grid[y:y + 3, x:x+3]
+        grid_region = batch_state.grid[y:y+3, x:x+3]
         if torch.any(present * grid_region > 0):
             reward = torch.tensor(-20, dtype=torch.float32)
             done = torch.tensor(True)
@@ -168,17 +167,32 @@ class PresentEnv(EnvBase):
                    for b_state, b_action in zip(states, actions)]
 
         # Unzip results
-        batch_grids, batch_presents, batch_present_counts, batch_rewards, batch_dones = zip(
+        grids, presents_list, present_counts, rewards, dones = zip(
             *results)
+
+        # If batched, stack results
+        batch_size = tensordict.batch_size[0] if tensordict.batch_size else 1
+        if batch_size > 1:
+            grid = torch.stack(grids)
+            presents = torch.stack(presents_list)
+            present_count = torch.stack(present_counts)
+            reward = torch.stack(rewards)
+            done = torch.stack(dones)
+        else:
+            grid = grids[0]
+            presents = presents_list[0]
+            present_count = present_counts[0]
+            reward = rewards[0]
+            done = dones[0]
 
         return TensorDict({
             "observation": {
-                "grid": torch.stack(batch_grids),
-                "presents": torch.stack(batch_presents),
-                "present_count": torch.stack(batch_present_counts)
+                "grid": grid,
+                "presents": presents,
+                "present_count": present_count
             },
-            "reward": torch.stack(batch_rewards),
-            "done": torch.stack(batch_dones)
+            "reward": reward,
+            "done": done
         })
 
     def rollout(self, max_steps=1000, policy=None, callback=None, **_kwargs):
