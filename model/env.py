@@ -7,6 +7,8 @@ from torchrl.data import (Bounded, Composite, Unbounded,
                           Categorical)
 from torchrl.envs import EnvBase
 
+from model.datatypes import action, state
+
 MAX_PRESENT_IDX = 5
 MAX_ROT = 3
 MAX_FLIP = 1
@@ -18,17 +20,13 @@ class PresentEnv(EnvBase):
     def __init__(
             self,
             start_state: TensorDict,
-            batch_size=None,
             seed=None,
             device=None,
     ):
-        if batch_size is None:
-            batch_size = torch.Size([])
 
         self.start_state = start_state
 
-        super().__init__(device=device, batch_size=batch_size)
-        self.batch_size = batch_size
+        super().__init__(device=device)
         self.rng = None
 
         if seed is None:
@@ -110,79 +108,78 @@ class PresentEnv(EnvBase):
                 "presents": presents,
                 "present_count": present_count,
             },
-        }, batch_size=self.batch_size, device=self.device)
+        }, device=self.device)
 
-    def _step(self, tensordict: TensorDict) -> TensorDict:
-        """ Execute one action - returns NEXT observation + reward + done """
-        # Get current state and action
-        grid = tensordict.get(("observation", "grid")).clone()
-        presents = tensordict.get(("observation", "presents"))
-        present_count = tensordict.get(
-            ("observation", "present_count")).clone()
+    def _handle_batch(
+            self,
+            batch_state: state.State,
+            batch_action: action.Action
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        w, h = batch_state.grid.shape
 
-        present_idx = int(tensordict.get(("action", "present_idx")))
-        rot = int(tensordict.get(("action", "rot")))
-        flip = tensordict.get(("action", "flip")).tolist()[0]
-        x = int(tensordict.get(("action", "x")))
-        y = int(tensordict.get(("action", "y")))
+        # out of bounds check
+        in_bounds = (batch_action.x >= 0) & (batch_action.y >= 0) & (
+            batch_action.x + 2 < w) & (batch_action.y + 2 < h)
+        if not in_bounds:
+            reward = torch.tensor(-40, dtype=torch.float32)
+            done = torch.tensor(True)
+            return batch_state.grid, batch_state.presents, batch_state.present_count, reward, done
 
-        # Get present
-        present = presents[present_idx]
-        present = torch.rot90(present, rot)
+        present = batch_state.presents[batch_action.present_idx].clone(
+        )
+        present = torch.rot90(present, batch_action.rot)
 
-        if flip[0]:
+        if batch_action.flip[0]:
             present = torch.flip(present, (1,))
-        if flip[1]:
+        if batch_action.flip[1]:
             present = torch.flip(present, (0,))
 
-        # If x and y are out of range, exit early
-        grid_region = grid[y:y+3, x:x+3]
-        if grid_region.shape != present.shape:
-            return TensorDict({
-                "observation": {
-                    "grid": grid,
-                    "presents": presents,
-                    "present_count": present_count,
-                },
-                "reward": torch.tensor(-20, dtype=torch.float32),
-                "done": torch.tensor(True)
-            }, batch_size=self.batch_size, device=self.device)
+        # round x y values
+        x, y = round(float(batch_action.x)), round(float(batch_action.y))
 
-        # If collision, exit early
+        # collision check
+        grid_region = batch_state.grid[y:y + 3, x:x+3]
         if torch.any(present * grid_region > 0):
-            return TensorDict({
-                "observation": {
-                    "grid": grid,
-                    "presents": presents,
-                    "present_count": present_count,
-                },
-                "reward": torch.tensor(-20, dtype=torch.float32),
-                "done": torch.tensor(True)
-            }, batch_size=self.batch_size, device=self.device)
+            reward = torch.tensor(-20, dtype=torch.float32)
+            done = torch.tensor(True)
+            return batch_state.grid, batch_state.presents, batch_state.present_count, reward, done
 
-        # Otherwise, update tensors
-        present_count[present_idx] -= 1
-        grid[y:y+3, x:x+3] = torch.maximum(grid_region, present)
+        batch_state.present_count[batch_action.present_idx] -= 1
+        batch_state.grid[y:y+3, x:x+3] = torch.maximum(grid_region, present)
 
         # Base reward
         reward = torch.tensor(10, dtype=torch.float32)
 
         # Check if all shapes are placed
         done = torch.tensor(False)
-        if torch.sum(present_count) == 0:
+        if torch.sum(batch_state.present_count) == 0:
             done = torch.tensor(True)
-            # add extra reward
             reward += 200
+
+        return batch_state.grid, batch_state.presents, batch_state.present_count, reward, done
+
+    def _step(self, tensordict: TensorDict) -> TensorDict:
+        """ Execute one action - returns NEXT observation + reward + done """
+        states = state.from_tensordict(tensordict)
+        actions = action.from_tensordict(tensordict)
+
+        # Process everything in one loop
+        results = [self._handle_batch(b_state, b_action)
+                   for b_state, b_action in zip(states, actions)]
+
+        # Unzip results
+        batch_grids, batch_presents, batch_present_counts, batch_rewards, batch_dones = zip(
+            *results)
 
         return TensorDict({
             "observation": {
-                "grid": grid,
-                "presents": presents,
-                "present_count": present_count,
+                "grid": torch.stack(batch_grids),
+                "presents": torch.stack(batch_presents),
+                "present_count": torch.stack(batch_present_counts)
             },
-            "reward": reward,
-            "done": done
-        }, batch_size=self.batch_size, device=self.device)
+            "reward": torch.stack(batch_rewards),
+            "done": torch.stack(batch_dones)
+        })
 
     def rollout(self, max_steps=1000, policy=None, callback=None, **_kwargs):
         """ Executes environment rollout with given policy using TensorDict operations. """
