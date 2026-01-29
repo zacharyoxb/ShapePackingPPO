@@ -57,10 +57,9 @@ class FeatureExtractor(nn.Module):
 
     def forward(self, tensordict):
         """ Module forward functions - gets data features """
-        # Clone to avoid modifying original tensordict
-        grid = tensordict.get("grid").detach().clone()
-        presents = tensordict.get("presents").detach().clone()
-        present_count = tensordict.get("present_count").detach().clone()
+        grid = tensordict.get("grid")
+        presents = tensordict.get("presents")
+        present_count = tensordict.get("present_count")
 
         # Check if batch (and channel, if using conv2d) dimensions exist
         if grid.dim() < 3:

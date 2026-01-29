@@ -97,9 +97,9 @@ class PresentEnv(EnvBase):
     def _reset(self, tensordict, **kwargs) -> TensorDict:
         """ Initialize new episode - returns FIRST observation """
 
-        grid = self.start_state.get("grid")
-        presents = self.start_state.get("presents")
-        present_count = self.start_state.get("present_count")
+        grid = self.start_state.get("grid").clone()
+        presents = self.start_state.get("presents").clone()
+        present_count = self.start_state.get("present_count").clone()
 
         # Return as TensorDict with observation keys
         return TensorDict({
