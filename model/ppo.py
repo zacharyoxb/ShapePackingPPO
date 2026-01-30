@@ -79,7 +79,7 @@ class PPO:
             lmbda=self.config.lmbda,
             value_network=self.value_module,
             average_gae=True,
-            device=torch.device(self.device)
+            device=self.device
         )
 
         self.loss_module = ClipPPOLoss(
@@ -89,7 +89,8 @@ class PPO:
             entropy_bonus=bool(self.config.entropy_eps),
             entropy_coeff=self.config.entropy_eps,
             critic_coeff=1.0,
-            loss_critic_type="smooth_l1"
+            loss_critic_type="smooth_l1",
+            device=self.device
         )
 
         self.optim = torch.optim.Adam(
