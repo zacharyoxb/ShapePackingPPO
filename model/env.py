@@ -201,16 +201,13 @@ class PresentEnv(EnvBase):
         # Reset environment
         _data = self.reset()
 
-        policy_input = _data.get("observation").select(
-            "grid", "presents", "present_count")
-
         # While present_count more than 0 and steps not exceeded
         for i in range(max_steps):
             # Compute an action given a policy
             if policy:
-                _data["action"] = policy(policy_input)
+                _data.update(policy(_data))
             else:
-                _data["action"] = self.action_spec.rand()
+                _data.update(self.action_spec.rand())
 
             # execute step, collect data
             _data = self.step(_data)
@@ -220,7 +217,7 @@ class PresentEnv(EnvBase):
             _data = self.step_mdp(_data)
 
             # check if count is 0, if so, break
-            present_count = _data["present_count"]
+            present_count = _data.get(("observation", "present_count"))
             if torch.sum(present_count) == 0:
                 break
 

@@ -115,8 +115,7 @@ class PPO:
             # convert td to device we are using
             # init the collector using td env params
             def make_env(start_state=td) -> PresentEnv:
-                env = PresentEnv(start_state)
-                env.to(self.device)
+                env = PresentEnv(start_state, device=self.device)
                 return env
 
             collector = SyncDataCollector(
@@ -168,8 +167,6 @@ class PPO:
                 cum_reward_str = (
                     f"average reward={logs['reward'][-1]: 4.4f} (init={logs['reward'][0]: 4.4f})"
                 )
-                logs["step_count"].append(batch["step_count"].max().item())
-                stepcount_str = f"step count (max): {logs['step_count'][-1]}"
                 logs["lr"].append(self.optim.param_groups[0]["lr"])
                 lr_str = f"lr policy: {logs['lr'][-1]: 4.4f}"
 
@@ -184,17 +181,14 @@ class PPO:
                         logs["eval reward (sum)"].append(
                             eval_rollout["next", "reward"].sum().item()
                         )
-                        logs["eval step_count"].append(
-                            eval_rollout["step_count"].max().item())
                         eval_str = (
                             f"eval cumulative reward: {logs['eval reward (sum)'][-1]: 4.4f} "
                             f"(init: {logs['eval reward (sum)'][0]: 4.4f}), "
-                            f"eval step-count: {logs['eval step_count'][-1]}"
                         )
                         del eval_rollout
 
                 pbar.set_description(
-                    ", ".join([eval_str, cum_reward_str, stepcount_str, lr_str]))
+                    ", ".join([eval_str, cum_reward_str, lr_str]))
 
                 self.scheduler.step()
 
