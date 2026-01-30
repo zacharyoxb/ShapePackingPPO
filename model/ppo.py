@@ -21,7 +21,7 @@ from model.modules.actor import PresentActor
 from model.modules.critic import PresentCritic
 from model.env import PresentEnv
 from model.config.ppo_config import PPOConfig
-from data.reader import get_data_generator
+from data.reader import get_data
 
 
 class PPO:
@@ -33,7 +33,7 @@ class PPO:
             ) else torch.device('cpu')
         )
         self.config = config or PPOConfig()
-        self.data_generator = get_data_generator(self.device, input_name)
+        self.input_data = get_data(self.device, input_name)
 
         # Set up Actor and Critic
         self.actor_net = PresentActor(self.device)
@@ -107,11 +107,9 @@ class PPO:
         """ Train the model """
 
         logs = defaultdict(list)
-        pbar = tqdm(total=self.config.total_frames)
-        eval_str = ""
 
         # for every set of data in the generator
-        for td in self.data_generator:
+        for td in tqdm(self.input_data, desc="Total progress", position=0):
             # convert td to device we are using
             # init the collector using td env params
             def make_env(start_state=td) -> PresentEnv:
@@ -136,6 +134,9 @@ class PPO:
                 sampler=SamplerWithoutReplacement(),
             )
 
+            pbar = tqdm(total=self.config.total_frames,
+                        desc="Current batch progress", position=1)
+
             for i, batch in enumerate(collector):
                 # Reuse same data batch several times
                 for _ in range(self.config.num_epochs):
@@ -143,11 +144,14 @@ class PPO:
                     self.advantage_module(batch)
                     replay_buffer.extend(batch.cpu())
                     # Carry out updates on sub batches
+
                     for _ in range(self.config.frames_per_batch // self.config.sub_batch_size):
                         # Calculate loss on subdata sample
                         subdata = replay_buffer.sample(
                             self.config.sub_batch_size)
+
                         loss_vals = self.loss_module(subdata.to(self.device))
+
                         loss_value = (
                             loss_vals["loss_objective"]
                             + loss_vals["loss_critic"]
@@ -156,6 +160,10 @@ class PPO:
 
                         # Optimise
                         loss_value.backward()
+
+                        # Clear loss tensors immediately after backward
+                        del loss_value, loss_vals
+
                         torch.nn.utils.clip_grad_norm_(
                             self.loss_module.parameters(), self.config.max_grad_norm)
                         self.optim.step()
@@ -165,10 +173,10 @@ class PPO:
                 logs["reward"].append(batch["next", "reward"].mean().item())
                 pbar.update(batch.numel())
                 cum_reward_str = (
-                    f"average reward={logs['reward'][-1]: 4.4f} (init={logs['reward'][0]: 4.4f})"
+                    f"average reward={logs['reward'][-1]: 4.2f} (init={logs['reward'][0]: 4.2f})"
                 )
                 logs["lr"].append(self.optim.param_groups[0]["lr"])
-                lr_str = f"lr policy: {logs['lr'][-1]: 4.4f}"
+                lr_str = f"lr policy: {logs['lr'][-1]: 4.5f}"
 
                 # Every 10 batches, evaluate the policy
                 if i % 10 == 0:
@@ -181,14 +189,11 @@ class PPO:
                         logs["eval reward (sum)"].append(
                             eval_rollout["next", "reward"].sum().item()
                         )
-                        eval_str = (
-                            f"eval cumulative reward: {logs['eval reward (sum)'][-1]: 4.4f} "
-                            f"(init: {logs['eval reward (sum)'][0]: 4.4f}), "
-                        )
+
                         del eval_rollout
 
                 pbar.set_description(
-                    ", ".join([eval_str, cum_reward_str, lr_str]))
+                    "Current batch progress:  " + ", ".join([cum_reward_str, lr_str]))
 
                 self.scheduler.step()
 

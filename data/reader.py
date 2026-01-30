@@ -1,7 +1,6 @@
 """ Reads data from text """
 
 import re
-from typing import Generator
 
 from tensordict import TensorDict
 import torch
@@ -53,10 +52,12 @@ def _get_placement_info(file_name="input.txt") -> list[tuple[int, int, torch.Ten
     return args
 
 
-def get_data_generator(device, file_name="input.txt") -> Generator[TensorDict, None, None]:
+def get_data(device, file_name="input.txt") -> list[TensorDict]:
     """ Collates all data into a dataset """
     presents = _get_presents(file_name)
     placement_info = _get_placement_info(file_name)
+
+    data = []
 
     for grid_width, grid_height, present_count in placement_info:
         params = TensorDict({
@@ -64,4 +65,6 @@ def get_data_generator(device, file_name="input.txt") -> Generator[TensorDict, N
             "presents": presents.clone(),
             "present_count": present_count.clone(),
         }, batch_size=[], device=device)
-        yield params
+        data.append(params)
+
+    return data

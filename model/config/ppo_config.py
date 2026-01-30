@@ -16,7 +16,7 @@ class Hyperparameters:
     )
     num_cells = 256
     lr = 3e-4
-    max_grad_norm = 0.3
+    max_grad_norm = 0.5
 
 
 @dataclass
