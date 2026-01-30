@@ -5,6 +5,7 @@ from collections import defaultdict
 import torch
 from tqdm import tqdm
 from torch import distributions as d
+from torchrl.data import ReplayBuffer, LazyMemmapStorage, SamplerWithoutReplacement
 from torchrl.modules import ProbabilisticActor
 from torchrl.collectors import SyncDataCollector
 from torchrl.objectives.value import GAE
@@ -95,7 +96,7 @@ class PPO:
 
         self.optim = torch.optim.Adam(
             self.loss_module.parameters(),
-            lr=self.config.lr
+            lr=self.config.lr,
         )
 
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
@@ -127,17 +128,27 @@ class PPO:
                 device=self.device,
             )
 
-            for i, batch in enumerate(collector):
-                # calculate advantage of current batch
-                self.advantage_module(batch)
-                data_view = batch.reshape(-1)
+            # Note: memmap is cpu - only
+            replay_buffer = ReplayBuffer(
+                storage=LazyMemmapStorage(
+                    max_size=self.config.frames_per_batch,
+                    device=torch.device("cpu")
+                ),
+                sampler=SamplerWithoutReplacement(),
+            )
 
+            for i, batch in enumerate(collector):
                 # Reuse same data batch several times
                 for _ in range(self.config.num_epochs):
+                    # calculate advantage of current batch
+                    self.advantage_module(batch)
+                    replay_buffer.extend(batch.cpu())
                     # Carry out updates on sub batches
                     for _ in range(self.config.frames_per_batch // self.config.sub_batch_size):
-                        # Calculate loss
-                        loss_vals = self.loss_module(data_view)
+                        # Calculate loss on subdata sample
+                        subdata = replay_buffer.sample(
+                            self.config.sub_batch_size)
+                        loss_vals = self.loss_module(subdata.to(self.device))
                         loss_value = (
                             loss_vals["loss_objective"]
                             + loss_vals["loss_critic"]
