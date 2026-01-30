@@ -192,13 +192,38 @@ class PPO:
 
                         del eval_rollout
 
+                    # checkpoint model
+                    self.save(True)
+
                 pbar.set_description(
                     "Current batch progress:  " + ", ".join([cum_reward_str, lr_str]))
 
                 self.scheduler.step()
 
-    def save(self):
-        """ Save the model """
+            # final save
+            self.save(False)
+
+    def save(self, _is_checkpoint: bool):
+        """
+        Save the model, optimizer, and scheduler states.
+
+        Args:
+            isCheckpoint: indicates that the current save is a checkpoint and not a completed model.
+        """
+
+        # Create save dictionary
+        _save_dict = {
+            'actor_state_dict': self.actor_net.state_dict(),
+            'critic_state_dict': self.value_net.state_dict(),
+            'policy_module_state_dict': self.policy_module.state_dict(),
+            'value_module_state_dict': self.value_module.state_dict(),
+            'loss_module_state_dict': self.loss_module.state_dict(),
+            'optimizer_state_dict': self.optim.state_dict(),
+            'scheduler_state_dict': self.scheduler.state_dict(),
+        }
+
+        # Save the model
+        # torch.save(save_dict, f"{save_path}.pt")
 
     def run(self):
         """ Run the model """
