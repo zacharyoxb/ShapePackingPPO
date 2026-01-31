@@ -1,4 +1,3 @@
 uv.lock
 __pycache__
-ckpt_*
-model_*
+*.pt
