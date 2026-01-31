@@ -83,9 +83,9 @@ class PresentActor(nn.Module):
         flip_logits = self.heads.flip(all_features)
 
         x_loc = self.heads.x_loc(all_features)
-        x_scale = torch.exp(self.heads.x_scale(all_features))
+        x_scale = torch.abs(self.heads.x_scale(all_features))
         y_loc = self.heads.y_loc(all_features)
-        y_scale = torch.exp(self.heads.y_scale(all_features))
+        y_scale = torch.abs(self.heads.y_scale(all_features))
 
         # mask out unavailable presents from logits
         idx_mask = (present_count > 0).float()
