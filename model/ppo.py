@@ -21,7 +21,8 @@ from model.modules.actor import PresentActor
 from model.modules.critic import PresentCritic
 from model.env import PresentEnv
 from model.config.ppo_config import PPOConfig
-from data.reader import get_data
+from model.saved_models.save_manager import ModelData, ModelSaveManager
+from data.data_reader import get_data
 
 
 class PPO:
@@ -193,7 +194,7 @@ class PPO:
                         del eval_rollout
 
                     # checkpoint model
-                    self.save(True)
+                    self.save(logs, True)
 
                 pbar.set_description(
                     "Current batch progress:  " + ", ".join([cum_reward_str, lr_str]))
@@ -201,29 +202,33 @@ class PPO:
                 self.scheduler.step()
 
             # final save
-            self.save(False)
+            self.save(logs, False)
 
-    def save(self, _is_checkpoint: bool):
+    def save(self, logs, is_checkpoint: bool):
         """
         Save the model, optimizer, and scheduler states.
 
         Args:
+            logs: logs containing subsequent model data
             isCheckpoint: indicates that the current save is a checkpoint and not a completed model.
         """
 
-        # Create save dictionary
-        _save_dict = {
-            'actor_state_dict': self.actor_net.state_dict(),
-            'critic_state_dict': self.value_net.state_dict(),
-            'policy_module_state_dict': self.policy_module.state_dict(),
-            'value_module_state_dict': self.value_module.state_dict(),
-            'loss_module_state_dict': self.loss_module.state_dict(),
-            'optimizer_state_dict': self.optim.state_dict(),
-            'scheduler_state_dict': self.scheduler.state_dict(),
-        }
+        data = ModelData(
+            logs['reward'][-1],
+            self.actor_net.state_dict(),
+            self.value_net.state_dict(),
+            self.policy_module.state_dict(),
+            self.value_module.state_dict(),
+            self.loss_module.state_dict(),
+            self.optim.state_dict(),
+            self.scheduler.state_dict()
+        )
 
-        # Save the model
-        # torch.save(save_dict, f"{save_path}.pt")
+        manager = ModelSaveManager()
+        if is_checkpoint:
+            manager.save_checkpoint(data)
+        else:
+            manager.save(data)
 
     def run(self):
         """ Run the model """
