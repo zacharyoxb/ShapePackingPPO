@@ -209,13 +209,13 @@ class PPO:
 
                         del eval_rollout
 
-                    # checkpoint model
-                    self.save(logs, True)
-
                 pbar.set_description(
                     "Current batch progress:  " + ", ".join([cum_reward_str, lr_str]))
 
                 self.scheduler.step()
+
+                # checkpoint model now batch has finished
+                self.save(logs, True)
 
             # final save
             self.save(logs, False)
