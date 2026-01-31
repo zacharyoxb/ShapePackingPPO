@@ -82,7 +82,7 @@ class ModelSaveManager:
         ckpt_data = []
 
         for ckpt in self._instance.ckpts:
-            ckpt_data.append(torch.load(ckpt))
+            ckpt_data.append(torch.load(ckpt, weights_only=False))
 
         sorted_ckpts = sorted(ckpt_data, key=lambda data: data.avg_reward)
 
@@ -115,7 +115,7 @@ class ModelSaveManager:
             torch.save(model_data, f=ckpt_path)
             self._instance.ckpts.append(ckpt_path)
 
-    def load_best(self):
+    def load_best(self) -> Optional[ModelData]:
         """ Loads best model """
         if not self._instance:
             return None
@@ -123,7 +123,10 @@ class ModelSaveManager:
         model_data = []
 
         for model in self._instance.ckpts:
-            model_data.append(torch.load(model))
+            model_data.append(torch.load(model, weights_only=False))
+
+        if not model_data:
+            return None
 
         best_model = max(model_data, key=lambda data: data.avg_reward)
         return best_model

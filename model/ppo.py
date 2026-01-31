@@ -104,6 +104,22 @@ class PPO:
             self.optim, self.config.total_frames // self.config.frames_per_batch, 0.0
         )
 
+        self.load_from_models()
+
+    def load_from_models(self):
+        """ If model already exists in full_models, load it """
+        manager = ModelSaveManager()
+        best = manager.load_best()
+
+        if best:
+            self.actor_net.load_state_dict(best.actor_state)
+            self.value_net.load_state_dict(best.critic_state)
+            self.policy_module.load_state_dict(best.policy_state)
+            self.value_module.load_state_dict(best.value_state)
+            self.loss_module.load_state_dict(best.loss_state)
+            self.optim.load_state_dict(best.optim_state)
+            self.scheduler.load_state_dict(best.scheduler_state)
+
     def train(self):
         """ Train the model """
 
