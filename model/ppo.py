@@ -120,6 +120,30 @@ class PPO:
             self.optim.load_state_dict(best.optim_state)
             self.scheduler.load_state_dict(best.scheduler_state)
 
+    def _process_sub_batch(self, replay_buffer):
+        # Calculate loss on subdata sample
+        subdata = replay_buffer.sample(
+            self.config.sub_batch_size)
+
+        loss_vals = self.loss_module(subdata.to(self.device))
+
+        loss_value = (
+            loss_vals["loss_objective"]
+            + loss_vals["loss_critic"]
+            + loss_vals["loss_entropy"]
+        )
+
+        # Optimise
+        loss_value.backward()
+
+        # Clear loss tensors immediately after backward
+        del loss_value, loss_vals
+
+        torch.nn.utils.clip_grad_norm_(
+            self.loss_module.parameters(), self.config.max_grad_norm)
+        self.optim.step()
+        self.optim.zero_grad()
+
     def train(self):
         """ Train the model """
 
@@ -127,8 +151,6 @@ class PPO:
 
         # for every set of data in the generator
         for td in tqdm(self.input_data, desc="Total progress", position=0):
-            # convert td to device we are using
-            # init the collector using td env params
             def make_env(start_state=td) -> PresentEnv:
                 env = PresentEnv(start_state, device=self.device)
                 return env
@@ -155,36 +177,11 @@ class PPO:
                         desc="Current batch progress", position=1)
 
             for i, batch in enumerate(collector):
-                # Reuse same data batch several times
                 for _ in range(self.config.num_epochs):
-                    # calculate advantage of current batch
                     self.advantage_module(batch)
                     replay_buffer.extend(batch.cpu())
-                    # Carry out updates on sub batches
-
                     for _ in range(self.config.frames_per_batch // self.config.sub_batch_size):
-                        # Calculate loss on subdata sample
-                        subdata = replay_buffer.sample(
-                            self.config.sub_batch_size)
-
-                        loss_vals = self.loss_module(subdata.to(self.device))
-
-                        loss_value = (
-                            loss_vals["loss_objective"]
-                            + loss_vals["loss_critic"]
-                            + loss_vals["loss_entropy"]
-                        )
-
-                        # Optimise
-                        loss_value.backward()
-
-                        # Clear loss tensors immediately after backward
-                        del loss_value, loss_vals
-
-                        torch.nn.utils.clip_grad_norm_(
-                            self.loss_module.parameters(), self.config.max_grad_norm)
-                        self.optim.step()
-                        self.optim.zero_grad()
+                        self._process_sub_batch(replay_buffer)
 
                 # Processed all epochs, log data
                 logs["reward"].append(batch["next", "reward"].mean().item())
@@ -214,11 +211,11 @@ class PPO:
 
                 self.scheduler.step()
 
-                # checkpoint model now batch has finished
-                self.save(logs, True)
+            # checkpoint model now current data has been trained on
+            self.save(logs, True)
 
-            # final save
-            self.save(logs, False)
+        # final save
+        self.save(logs, False)
 
     def save(self, logs, is_checkpoint: bool):
         """

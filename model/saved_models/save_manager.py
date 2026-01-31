@@ -79,12 +79,13 @@ class ModelSaveManager:
         if not self._instance:
             return
 
-        ckpt_data = []
+        all_ckpt_data = []
 
         for ckpt in self._instance.ckpts:
-            ckpt_data.append(torch.load(ckpt, weights_only=False))
+            ckpt_data = torch.load(ckpt, weights_only=False)
+            all_ckpt_data.append(ckpt_data)
 
-        sorted_ckpts = sorted(ckpt_data, key=lambda data: data.avg_reward)
+        sorted_ckpts = sorted(all_ckpt_data, key=lambda data: data.avg_reward)
 
         # Determine how many to delete
         num_to_delete = len(sorted_ckpts) - self.max_ckpts
@@ -114,6 +115,7 @@ class ModelSaveManager:
             ckpt_path = Path(CHECKPOINT_DIR.joinpath(ckpt_name))
             torch.save(model_data, f=ckpt_path)
             self._instance.ckpts.append(ckpt_path)
+            self._remove_worst_checkpoints()
 
     def load_best(self) -> Optional[ModelData]:
         """ Loads best model """
@@ -128,5 +130,9 @@ class ModelSaveManager:
         if not model_data:
             return None
 
-        best_model = max(model_data, key=lambda data: data.avg_reward)
+        best_model = None
+        for data in model_data:
+            if best_model is None or best_model.avg_reward < data.avg_reward:
+                best_model = data
+
         return best_model

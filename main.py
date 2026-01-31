@@ -1,6 +1,6 @@
 """ Main file"""
 
-import warnings
+# import warnings
 
 from model.ppo import PPO
 
@@ -8,7 +8,7 @@ from model.ppo import PPO
 def main():
     """ Main function """
     # block output shape warning as it doesn't seem to be important
-    warnings.filterwarnings("ignore", category=UserWarning)
+    # warnings.filterwarnings("ignore", category=UserWarning)
 
     module = PPO()
     module.train()
