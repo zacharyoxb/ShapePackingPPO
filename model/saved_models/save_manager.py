@@ -73,12 +73,15 @@ class ModelSaveManager:
         if not self._instance:
             return None
 
-        model_data = []
-
-        if not model_data:
+        # no saved models/checkpoints available
+        if not self.models and not self.ckpts:
             return None
 
-        best_model = max(self.models)
+        # get best model / checkpoint
+        if self.models:
+            best_model = max(self.models)
+        else:
+            best_model = max(self.ckpts)
 
         return best_model.get_data()
 
