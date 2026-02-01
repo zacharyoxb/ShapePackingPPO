@@ -88,4 +88,8 @@ class ModelSaveManager:
     def ckpt_cleanup(self):
         """ Deletes all but the 5 best checkpoints. """
         sorted_ckpts = sorted(self.ckpts, reverse=True)
-        self.ckpts = sorted_ckpts[:5]
+        keep = sorted_ckpts[:5]
+        to_delete = sorted_ckpts[5:]
+        for ckpt in to_delete:
+            ckpt.unlink()
+        self.ckpts = keep
