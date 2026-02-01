@@ -110,6 +110,7 @@ class PresentActor(nn.Module):
                 },
                 "y": {
                     "loc": y_loc,
-                    "scale": y_scale},
+                    "scale": y_scale
+                },
             },
         }, device=self.device)

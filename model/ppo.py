@@ -140,7 +140,8 @@ class PPO:
         del loss_value, loss_vals
 
         torch.nn.utils.clip_grad_norm_(
-            self.loss_module.parameters(), self.config.max_grad_norm)
+            self.loss_module.parameters(), self.config.max_grad_norm
+        )
         self.optim.step()
         self.optim.zero_grad()
 

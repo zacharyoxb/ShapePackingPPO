@@ -53,7 +53,7 @@ class ModelSaveManager:
             self._instance.models.append(wrapper)
 
     def save_checkpoint(self, model_data: ModelData):
-        """ Adds to checkpoint buffer / saves if buffer is full """
+        """ Saves data as checkpoint """
         if self._instance:
             # check if cleanup is due
             if self.last_cleanup > 10:
