@@ -48,7 +48,8 @@ class PresentActor(nn.Module):
         x_loc = nn.Sequential(
             nn.Linear(self.extractor.features, 64),
             nn.ReLU(),
-            nn.Linear(64, 1)
+            nn.Linear(64, 1),
+            nn.Tanh()
         ).to(self.device)
         x_scale = nn.Sequential(
             nn.Linear(self.extractor.features, 64),
@@ -59,7 +60,8 @@ class PresentActor(nn.Module):
         y_loc = nn.Sequential(
             nn.Linear(self.extractor.features, 64),
             nn.ReLU(),
-            nn.Linear(64, 1)
+            nn.Linear(64, 1),
+            nn.Tanh()
         ).to(self.device)
         y_scale = nn.Sequential(
             nn.Linear(self.extractor.features, 64),
@@ -84,10 +86,11 @@ class PresentActor(nn.Module):
         rot_logits = self.heads.rot(all_features)
         flip_logits = self.heads.flip(all_features)
 
+        # +1e-4 ensures numerical instability around 0
         x_loc = self.heads.x_loc(all_features)
-        x_scale = self.heads.x_scale(all_features)
+        x_scale = self.heads.x_scale(all_features) + 1e-4
         y_loc = self.heads.y_loc(all_features)
-        y_scale = self.heads.y_scale(all_features)
+        y_scale = self.heads.y_scale(all_features) + 1e-4
 
         # mask out unavailable presents from logits
         idx_mask = (present_count > 0).float()

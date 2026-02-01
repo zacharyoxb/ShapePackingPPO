@@ -1,10 +1,12 @@
 """ Code for the neural network itself. """
 
 from collections import defaultdict
+import os
 
 import torch
 from tqdm import tqdm
 from torch import distributions as d
+from torchrl.envs import ParallelEnv
 from torchrl.data import ReplayBuffer, LazyMemmapStorage, SamplerWithoutReplacement
 from torchrl.modules import ProbabilisticActor
 from torchrl.collectors import SyncDataCollector
@@ -152,9 +154,21 @@ class PPO:
 
         # for every set of data in the generator
         for td in tqdm(self.input_data, desc="Total progress", position=0):
-            def make_env(start_state=td) -> PresentEnv:
-                env = PresentEnv(start_state, device=self.device)
-                return env
+            def make_env(start_state=td) -> ParallelEnv:
+                if self.device == torch.device("cuda"):
+                    num_workers = min(
+                        4, torch.cuda.get_device_properties(0).total_memory / 1e9)
+                else:
+                    num_workers = min(8, os.cpu_count() or 4)
+
+                return ParallelEnv(
+                    num_workers=num_workers,
+                    create_env_fn=PresentEnv,  # type: ignore
+                    create_env_kwargs={
+                        "start_state": start_state, "device": self.device
+                    },
+                    device=self.device
+                )
 
             collector = SyncDataCollector(
                 make_env,  # type: ignore
