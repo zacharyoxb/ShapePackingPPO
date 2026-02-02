@@ -48,7 +48,8 @@ class PresentActor(nn.Module):
         x_loc = nn.Sequential(
             nn.Linear(self.extractor.features, 64),
             nn.ReLU(),
-            nn.Linear(64, 1)
+            nn.Linear(64, 1),
+            nn.Tanh()
         ).to(self.device)
         x_scale = nn.Sequential(
             nn.Linear(self.extractor.features, 64),
@@ -59,7 +60,8 @@ class PresentActor(nn.Module):
         y_loc = nn.Sequential(
             nn.Linear(self.extractor.features, 64),
             nn.ReLU(),
-            nn.Linear(64, 1)
+            nn.Linear(64, 1),
+            nn.Tanh()
         ).to(self.device)
         y_scale = nn.Sequential(
             nn.Linear(self.extractor.features, 64),
