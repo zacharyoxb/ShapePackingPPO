@@ -152,16 +152,12 @@ class PPO:
 
         # for every set of data in the generator
         for td in tqdm(self.input_data, desc="Total progress", position=0):
-            def make_env(start_state=td) -> PresentEnv:
-                env = PresentEnv(start_state, device=self.device)
-                return env
-
             collector = SyncDataCollector(
-                make_env,  # type: ignore
+                PresentEnv.make_parallel_env,  # type: ignore
                 self.policy_module,
                 frames_per_batch=self.config.frames_per_batch,
                 total_frames=self.config.total_frames,
-                create_env_kwargs={"start_state": td},
+                create_env_kwargs={"start_state": td, "num_workers": 4},
                 device=self.device,
             )
 
@@ -197,7 +193,7 @@ class PPO:
                 if i % 10 == 0:
                     with set_interaction_type(InteractionType.DETERMINISTIC), torch.no_grad():
                         # execute a rollout with the trained policy
-                        env = make_env()
+                        env = PresentEnv(td, device=self.device)
                         eval_rollout = env.rollout(1000, self.policy_module)
                         logs["eval reward"].append(
                             eval_rollout["next", "reward"].mean().item())

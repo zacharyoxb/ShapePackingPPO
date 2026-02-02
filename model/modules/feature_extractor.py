@@ -61,16 +61,19 @@ class FeatureExtractor(nn.Module):
         presents = tensordict.get("presents")
         present_count = tensordict.get("present_count")
 
-        # Check if batch (and channel, if using conv2d) dimensions exist
-        if grid.dim() < 3:
+        # if grid has 2 dims, add channel and batch
+        if grid.dim() == 2:
             grid = grid.unsqueeze(0).unsqueeze(0)
-        else:
+        # if grid has 3 dims it has a batch dim, add channel
+        elif grid.dim() == 3:
             grid = grid.unsqueeze(1)
 
-        if presents.dim() < 4:
+        # if presents has 3 dims, add batch dim (add channel in loop)
+        if presents.dim() == 3:
             presents = presents.unsqueeze(0)
 
-        if present_count.dim() < 2:
+        # if present_count has 1 dim, add batch dim
+        if present_count.dim() == 1:
             present_count = present_count.unsqueeze(0)
 
         # Extract grid/present_count features

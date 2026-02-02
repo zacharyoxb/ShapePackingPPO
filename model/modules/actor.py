@@ -91,7 +91,7 @@ class PresentActor(nn.Module):
 
         # mask out unavailable presents from logits
         idx_mask = (present_count > 0).float()
-        present_idx_logits = present_idx_logits + idx_mask.log()
+        present_idx_logits = present_idx_logits * idx_mask
 
         return TensorDict({
             "params": {

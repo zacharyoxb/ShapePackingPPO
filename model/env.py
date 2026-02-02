@@ -1,12 +1,10 @@
 """ Neural network for packing presents with orientation masks """
-
-import warnings
 import torch
 from tensordict import TensorDict
 
 from torchrl.data import (Bounded, Composite, Unbounded,
                           Categorical)
-from torchrl.envs import EnvBase
+from torchrl.envs import EnvBase, ParallelEnv
 
 from model.datatypes import action, state
 
@@ -42,12 +40,13 @@ class PresentEnv(EnvBase):
         # Action spec: what the agent can do
         return Composite({
             "action": {
-                "present_idx": Bounded(low=0, high=MAX_PRESENT_IDX, shape=1, dtype=torch.uint8),
-                "rot": Bounded(low=0, high=MAX_ROT, shape=1,
+                "present_idx": Bounded(low=0, high=MAX_PRESENT_IDX, shape=torch.Size([1]),
+                                       dtype=torch.uint8),
+                "rot": Bounded(low=0, high=MAX_ROT, shape=torch.Size([1]),
                                dtype=torch.uint8),
                 "flip": Bounded(low=0, high=MAX_FLIP, shape=torch.Size([2]), dtype=torch.uint8),
-                "x": Unbounded(shape=1, dtype=torch.int64),
-                "y": Unbounded(shape=1, dtype=torch.int64)
+                "x": Unbounded(shape=torch.Size([1]), dtype=torch.int64),
+                "y": Unbounded(shape=torch.Size([1]), dtype=torch.int64)
             }
         })
 
@@ -71,12 +70,13 @@ class PresentEnv(EnvBase):
         # Action spec: what the agent can do
         self.action_spec = Composite({
             "action": {
-                "present_idx": Bounded(low=0, high=MAX_PRESENT_IDX, shape=1, dtype=torch.uint8),
-                "rot": Bounded(low=0, high=MAX_ROT, shape=1,
+                "present_idx": Bounded(low=0, high=MAX_PRESENT_IDX, shape=torch.Size([1]),
+                                       dtype=torch.uint8),
+                "rot": Bounded(low=0, high=MAX_ROT, shape=torch.Size([1]),
                                dtype=torch.uint8),
                 "flip": Bounded(low=0, high=MAX_FLIP, shape=torch.Size([2]), dtype=torch.uint8),
-                "x": Bounded(low=1, high=w-2, shape=1, dtype=torch.int64),
-                "y": Bounded(low=1, high=h-2, shape=1, dtype=torch.int64)
+                "x": Bounded(low=1, high=w-2, shape=torch.Size([1]), dtype=torch.int64),
+                "y": Bounded(low=1, high=h-2, shape=torch.Size([1]), dtype=torch.int64)
             }
         })
 
@@ -124,8 +124,6 @@ class PresentEnv(EnvBase):
         if not in_bounds:
             reward = torch.tensor(-40, dtype=torch.float32)
             done = torch.tensor(True)
-            if batch_state.presents.ndim == 2:
-                warnings.warn("OH HECK", UserWarning)
             return batch_state.grid, batch_state.presents, batch_state.present_count, reward, done
 
         present = batch_state.presents[batch_action.present_idx].clone()
@@ -144,8 +142,6 @@ class PresentEnv(EnvBase):
         if torch.any(present * grid_region > 0):
             reward = torch.tensor(-20, dtype=torch.float32)
             done = torch.tensor(True)
-            if batch_state.presents.ndim == 2:
-                warnings.warn("OH HECK", UserWarning)
             return batch_state.grid, batch_state.presents, batch_state.present_count, reward, done
 
         batch_state.present_count[batch_action.present_idx] -= 1
@@ -159,9 +155,6 @@ class PresentEnv(EnvBase):
         if torch.sum(batch_state.present_count) == 0:
             done = torch.tensor(True)
             reward += 200
-
-        if batch_state.presents.ndim == 2:
-            warnings.warn("OH HECK", UserWarning)
 
         return batch_state.grid, batch_state.presents, batch_state.present_count, reward, done
 
@@ -230,6 +223,48 @@ class PresentEnv(EnvBase):
                 break
 
         return data
+
+    @classmethod
+    def make_parallel_env(
+        cls,
+        start_state: TensorDict,
+        num_workers: int,
+        device: torch.device | None = None,
+    ) -> ParallelEnv:
+        """
+        Creates a ParallelEnv with multiple PresentEnv instances.
+
+        Args:
+            start_state: Initial state (will be cloned for each worker)
+            num_workers: Number of parallel environments 
+            device: Device to run environments on
+        """
+
+        if device is None:
+            device = torch.device(
+                "cuda" if torch.cuda.is_available() else "cpu")
+
+        base_seed = torch.empty((), dtype=torch.int64).random_().item()
+        seeds = [base_seed + i for i in range(num_workers)]
+
+        def create_env(worker_id: int = 0):
+            worker_start_state = start_state.clone()
+            worker_start_state = worker_start_state.to(device)
+
+            worker_seed = seeds[worker_id] if worker_id < len(
+                seeds) else seeds[0]
+
+            return PresentEnv(
+                start_state=worker_start_state,
+                seed=worker_seed,
+                device=device
+            )
+
+        return ParallelEnv(
+            num_workers=num_workers,
+            create_env_fn=create_env,
+            device=device
+        )
 
     def forward(self, *args, **kwargs):
         """ Unimplemented in environment only class """
