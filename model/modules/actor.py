@@ -95,6 +95,7 @@ class PresentActor(nn.Module):
         idx_mask = (present_count > 0).float()
         present_idx_logits = present_idx_logits * idx_mask
 
+        batch_size = tensordict.batch_size[0] if tensordict.batch_size else 1
         return TensorDict({
             "params": {
                 "present_idx": {
@@ -115,4 +116,4 @@ class PresentActor(nn.Module):
                     "scale": y_scale
                 },
             },
-        }, device=self.device)
+        }, batch_size=torch.Size([batch_size]), device=self.device)

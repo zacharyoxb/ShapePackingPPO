@@ -32,6 +32,7 @@ class PresentCritic(nn.Module):
         # calculate value
         value = self.critic_head(all_features)
 
+        batch_size = tensordict.batch_size[0] if tensordict.batch_size else 1
         return TensorDict({
             "state_value": value
-        }, batch_size=value.shape[0], device=self.device)
+        }, batch_size=torch.Size([batch_size]), device=self.device)
