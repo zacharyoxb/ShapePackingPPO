@@ -7,8 +7,7 @@ from model.ppo import PPO
 
 def main():
     """ Main function """
-    # block output shape warning as it doesn't seem to be important
-    warnings.filterwarnings("ignore", category=UserWarning)
+    warnings.filterwarnings("error", category=UserWarning)
 
     module = PPO()
     module.train()

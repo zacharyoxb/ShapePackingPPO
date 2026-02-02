@@ -1,5 +1,6 @@
 """ Neural network for packing presents with orientation masks """
 
+import warnings
 import torch
 from tensordict import TensorDict
 
@@ -60,7 +61,7 @@ class PresentEnv(EnvBase):
             "observation": {
                 "grid": Bounded(low=0, high=1, dtype=torch.float32, shape=grid.shape,
                                 device=self.device),
-                "presents": Bounded(low=0, high=1, shape=torch.Size([3, 3]),
+                "presents": Bounded(low=0, high=1, shape=torch.Size([6, 3, 3]),
                                     dtype=torch.float32, device=self.device),
                 "present_count": Unbounded(shape=torch.Size([6]), dtype=torch.float32,
                                            device=self.device),
@@ -123,6 +124,8 @@ class PresentEnv(EnvBase):
         if not in_bounds:
             reward = torch.tensor(-40, dtype=torch.float32)
             done = torch.tensor(True)
+            if batch_state.presents.ndim == 2:
+                warnings.warn("OH HECK", UserWarning)
             return batch_state.grid, batch_state.presents, batch_state.present_count, reward, done
 
         present = batch_state.presents[batch_action.present_idx].clone()
@@ -141,6 +144,8 @@ class PresentEnv(EnvBase):
         if torch.any(present * grid_region > 0):
             reward = torch.tensor(-20, dtype=torch.float32)
             done = torch.tensor(True)
+            if batch_state.presents.ndim == 2:
+                warnings.warn("OH HECK", UserWarning)
             return batch_state.grid, batch_state.presents, batch_state.present_count, reward, done
 
         batch_state.present_count[batch_action.present_idx] -= 1
@@ -154,6 +159,9 @@ class PresentEnv(EnvBase):
         if torch.sum(batch_state.present_count) == 0:
             done = torch.tensor(True)
             reward += 200
+
+        if batch_state.presents.ndim == 2:
+            warnings.warn("OH HECK", UserWarning)
 
         return batch_state.grid, batch_state.presents, batch_state.present_count, reward, done
 
