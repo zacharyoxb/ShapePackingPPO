@@ -126,8 +126,8 @@ class PresentEnv(EnvBase):
             done = torch.tensor(True)
             return batch_state.grid, batch_state.presents, batch_state.present_count, reward, done
 
-        present = batch_state.presents[batch_action.present_idx].clone()
-        present = torch.rot90(present, batch_action.rot)
+        present = batch_state.presents[int(batch_action.present_idx)].clone()
+        present = torch.rot90(present, int(batch_action.rot))
 
         if batch_action.flip[0]:
             present = torch.flip(present, (1,))
@@ -144,7 +144,7 @@ class PresentEnv(EnvBase):
             done = torch.tensor(True)
             return batch_state.grid, batch_state.presents, batch_state.present_count, reward, done
 
-        batch_state.present_count[batch_action.present_idx] -= 1
+        batch_state.present_count[int(batch_action.present_idx)] -= 1
         batch_state.grid[y:y+3, x:x+3] = torch.maximum(grid_region, present)
 
         # Base reward
