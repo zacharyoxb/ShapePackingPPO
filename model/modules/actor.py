@@ -86,10 +86,17 @@ class PresentActor(nn.Module):
         rot_logits = self.heads.rot(all_features)
         flip_logits = self.heads.flip(all_features)
 
+        # Get outputs for Normal distribution
         x_loc = self.heads.x_loc(all_features)
         x_scale = self.heads.x_scale(all_features)
         y_loc = self.heads.y_loc(all_features)
         y_scale = self.heads.y_scale(all_features)
+
+        # Squeeze for scalar dims
+        x_loc = x_loc.squeeze(-1)
+        x_scale = x_scale.squeeze(-1)
+        y_loc = y_loc.squeeze(-1)
+        y_scale = y_scale.squeeze(-1)
 
         # mask out unavailable presents from logits
         idx_mask = (present_count > 0).float()
