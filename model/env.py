@@ -40,13 +40,13 @@ class PresentEnv(EnvBase):
         # Action spec: what the agent can do
         return Composite({
             "action": {
-                "present_idx": Bounded(low=0, high=MAX_PRESENT_IDX, shape=torch.Size([1]),
+                "present_idx": Bounded(low=0, high=MAX_PRESENT_IDX, shape=torch.Size([]),
                                        dtype=torch.uint8),
-                "rot": Bounded(low=0, high=MAX_ROT, shape=torch.Size([1]),
+                "rot": Bounded(low=0, high=MAX_ROT, shape=torch.Size([]),
                                dtype=torch.uint8),
-                "flip": Bounded(low=0, high=MAX_FLIP, shape=torch.Size([2]), dtype=torch.uint8),
-                "x": Unbounded(shape=torch.Size([1]), dtype=torch.int64),
-                "y": Unbounded(shape=torch.Size([1]), dtype=torch.int64)
+                "flip": Bounded(low=0, high=1, shape=torch.Size([]), dtype=torch.uint8),
+                "x": Unbounded(shape=torch.Size([]), dtype=torch.int64),
+                "y": Unbounded(shape=torch.Size([]), dtype=torch.int64)
             }
         })
 

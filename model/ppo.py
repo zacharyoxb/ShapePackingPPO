@@ -5,6 +5,7 @@ from collections import defaultdict
 import torch
 from tqdm import tqdm
 from torch import distributions as d
+from torchrl.envs import check_env_specs
 from torchrl.data import ReplayBuffer, LazyMemmapStorage, SamplerWithoutReplacement
 from torchrl.modules import ProbabilisticActor
 from torchrl.collectors import SyncDataCollector
@@ -152,6 +153,8 @@ class PPO:
 
         # for every set of data in the generator
         for td in tqdm(self.input_data, desc="Total progress", position=0):
+            check_env_specs(PresentEnv.make_parallel_env(td, 4))
+
             collector = SyncDataCollector(
                 PresentEnv.make_parallel_env,  # type: ignore
                 self.policy_module,
