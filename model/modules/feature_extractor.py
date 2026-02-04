@@ -93,9 +93,10 @@ class FeatureExtractor(nn.Module):
 
             # combine workers and batches
             workers, batches = grid.shape[0], grid.shape[1]
-            grid = grid.view(workers * batches, -1)
-            presents = presents.view(workers * batches, -1)
-            present_count = present_count.view(workers * batches, -1)
+            grid = grid.view(workers * batches, *grid.shape[2:])
+            presents = presents.view(workers * batches, *presents.shape[2:])
+            present_count = present_count.view(
+                workers * batches, *present_count.shape[2:])
 
         return grid, presents, present_count, workers, batches
 
