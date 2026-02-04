@@ -52,10 +52,10 @@ class FeatureExtractor(nn.Module):
             embed_dim=128,      # Must match your feature dimension
             num_heads=4,        # 4 heads for 128-dim (128/4=32 per head)
             batch_first=True,   # IMPORTANT: (batch, seq_len, embed_dim)
-            dropout=0.1         # Optional regularization
+            dropout=0.0         # Optional regularization
         ).to(device)
 
-        self.layer_norm = nn.LayerNorm(128)
+        self.layer_norm = nn.LayerNorm(128).to(device)
 
         combined_features = 128 + 128 + 128
 
@@ -135,9 +135,9 @@ class FeatureExtractor(nn.Module):
         """ Module forward functions - gets data features """
         # Add dimensions required to encode features
         grid, presents, present_count, workers, batches = self._add_dims(
-            tensordict.get("grid").detach().clone(),
-            tensordict.get("presents").detach().clone(),
-            tensordict.get("present_count").detach().clone()
+            tensordict.get("grid"),
+            tensordict.get("presents"),
+            tensordict.get("present_count")
         )
 
         # Extract grid/present/present_count features

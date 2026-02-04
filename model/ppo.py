@@ -8,7 +8,7 @@ from torch import distributions as d
 from torchrl.envs import check_env_specs
 from torchrl.data import ReplayBuffer, LazyMemmapStorage, SamplerWithoutReplacement
 from torchrl.modules import ProbabilisticActor
-from torchrl.collectors import SyncDataCollector
+from torchrl.collectors import MultiaSyncDataCollector
 from torchrl.objectives.value import GAE
 from torchrl.objectives import ClipPPOLoss
 from tensordict.nn import (
@@ -146,6 +146,9 @@ class PPO:
         self.optim.step()
         self.optim.zero_grad()
 
+        # Clear cache
+        torch.cuda.empty_cache()
+
     def train(self):
         """ Train the model """
 
@@ -154,13 +157,14 @@ class PPO:
         # for every set of data in the generator
         for td in tqdm(self.input_data, desc="Total progress", position=0):
             check_env_specs(PresentEnv.make_parallel_env(td, 4))
-            collector = SyncDataCollector(
+            collector = MultiaSyncDataCollector(
                 PresentEnv.make_parallel_env,  # type: ignore
                 self.policy_module,
                 frames_per_batch=self.config.frames_per_batch,
                 total_frames=self.config.total_frames,
                 create_env_kwargs={"start_state": td, "num_workers": 4},
                 device=self.device,
+                sync=True
             )
 
             # Note: memmap is cpu - only
