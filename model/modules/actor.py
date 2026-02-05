@@ -4,7 +4,7 @@ from tensordict import TensorDict
 from torch import nn
 import torch
 
-from model.modules.feature_extractor import FeatureExtractor
+from model.modules.features.feature_extractor import FeatureExtractor
 
 
 @dataclass
@@ -78,7 +78,7 @@ class PresentActor(nn.Module):
         # get present count for masking out impossible choices
         present_count = tensordict.get("present_count")
 
-        # get features
+        # get grid, present features
         all_features = self.extractor(tensordict)
 
         # calculate logits

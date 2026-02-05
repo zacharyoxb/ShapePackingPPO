@@ -5,10 +5,9 @@ from collections import defaultdict
 import torch
 from tqdm import tqdm
 from torch import distributions as d
-from torchrl.envs import check_env_specs
 from torchrl.data import ReplayBuffer, LazyMemmapStorage, SamplerWithoutReplacement
 from torchrl.modules import ProbabilisticActor
-from torchrl.collectors import MultiaSyncDataCollector
+from torchrl.collectors import SyncDataCollector
 from torchrl.objectives.value import GAE
 from torchrl.objectives import ClipPPOLoss
 from tensordict.nn import (
@@ -29,16 +28,16 @@ from data.data_reader import get_data
 class PPO:
     """ Implementation of the PPO actor-critic network """
 
-    def __init__(self, input_name="input.txt", config=None, device=None):
-        self.device = device or (
+    def __init__(self, input_name="input.txt", config=None, training_device=None):
+        self.training_device = training_device or (
             torch.device('cuda') if torch.cuda.is_available(
             ) else torch.device('cpu')
         )
         self.config = config or PPOConfig()
-        self.input_data = get_data(self.device, input_name)
+        self.input_data = get_data(torch.device("cpu"), input_name)
 
         # Set up Actor and Critic
-        self.actor_net = PresentActor(self.device)
+        self.actor_net = PresentActor(self.training_device)
         td_policy_module = TensorDictModule(
             self.actor_net,
             in_keys=["observation"],
@@ -69,7 +68,7 @@ class PPO:
             return_log_prob=True
         )
 
-        self.value_net = PresentCritic(self.device)
+        self.value_net = PresentCritic(self.training_device)
         self.value_module = TensorDictModule(
             module=self.value_net,
             in_keys=["observation"],
@@ -82,7 +81,7 @@ class PPO:
             lmbda=self.config.lmbda,
             value_network=self.value_module,
             average_gae=True,
-            device=self.device
+            device=self.training_device
         )
 
         self.loss_module = ClipPPOLoss(
@@ -93,7 +92,7 @@ class PPO:
             entropy_coeff=self.config.entropy_eps,
             critic_coeff=1.0,
             loss_critic_type="smooth_l1",
-            device=self.device
+            device=self.training_device
         )
 
         self.optim = torch.optim.Adam(
@@ -126,7 +125,7 @@ class PPO:
         subdata = replay_buffer.sample(
             self.config.sub_batch_size)
 
-        loss_vals = self.loss_module(subdata.to(self.device))
+        loss_vals = self.loss_module(subdata.to(self.training_device))
 
         loss_value = (
             loss_vals["loss_objective"]
@@ -146,9 +145,6 @@ class PPO:
         self.optim.step()
         self.optim.zero_grad()
 
-        # Clear cache
-        torch.cuda.empty_cache()
-
     def train(self):
         """ Train the model """
 
@@ -156,15 +152,20 @@ class PPO:
 
         # for every set of data in the generator
         for td in tqdm(self.input_data, desc="Total progress", position=0):
-            check_env_specs(PresentEnv.make_parallel_env(td, 4))
-            collector = MultiaSyncDataCollector(
+            collector = SyncDataCollector(
                 PresentEnv.make_parallel_env,  # type: ignore
                 self.policy_module,
                 frames_per_batch=self.config.frames_per_batch,
                 total_frames=self.config.total_frames,
-                create_env_kwargs={"start_state": td, "num_workers": 4},
-                device=self.device,
-                sync=True
+                create_env_kwargs={
+                    "start_state": td,
+                    "num_workers": 1,
+                    "device": torch.device("cpu")
+                },
+                # prevents linux CUDA permission err
+                device=torch.device("cpu"),
+                storing_device=torch.device("cpu"),
+                policy_device=self.training_device
             )
 
             # Note: memmap is cpu - only
@@ -180,15 +181,17 @@ class PPO:
                         desc="Current batch progress", position=1)
 
             for i, batch in enumerate(collector):
+                dev_batch = batch.to(self.training_device)
                 for _ in range(self.config.num_epochs):
-                    self.advantage_module(batch)
-                    replay_buffer.extend(batch.cpu())
+                    self.advantage_module(dev_batch)
+                    replay_buffer.extend(batch)
                     for _ in range(self.config.frames_per_batch // self.config.sub_batch_size):
                         self._process_sub_batch(replay_buffer)
 
                 # Processed all epochs, log data
-                logs["reward"].append(batch["next", "reward"].mean().item())
-                pbar.update(batch.numel())
+                logs["reward"].append(
+                    dev_batch["next", "reward"].mean().item())
+                pbar.update(dev_batch.numel())
                 cum_reward_str = (
                     f"average reward={logs['reward'][-1]: 4.2f} (init={logs['reward'][0]: 4.2f})"
                 )
@@ -199,7 +202,7 @@ class PPO:
                 if i % 10 == 0:
                     with set_interaction_type(InteractionType.DETERMINISTIC), torch.no_grad():
                         # execute a rollout with the trained policy
-                        env = PresentEnv(td, device=self.device)
+                        env = PresentEnv(td, device=self.training_device)
                         eval_rollout = env.rollout(1000, self.policy_module)
                         logs["eval reward"].append(
                             eval_rollout["next", "reward"].mean().item())
