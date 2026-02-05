@@ -6,12 +6,11 @@ import torch
 class PresentExtractor(nn.Module):
     """ Outputs tensor representing extracted present features """
 
-    def __init__(self, device, num_presents=6, ind_output_features=64):
+    def __init__(self, device, ind_output_features=64):
         super().__init__()
 
         self.device = device
         self.output_features = ind_output_features
-        self.num_presents = num_presents
 
         self.encoder = nn.Sequential(
             # First conv: extract basic shape patterns
@@ -55,7 +54,7 @@ class PresentExtractor(nn.Module):
             presents = presents.view(workers * batches, *presents.shape[2:])
 
         all_present_features = []
-        for i in range(self.num_presents):
+        for i in range(presents.shape[2]):
             present = presents[:, :, i, :, :]
             present_features = self.encoder(present)
             all_present_features.append(present_features)

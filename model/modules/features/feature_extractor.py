@@ -1,11 +1,9 @@
 """ Extracts features from data """
 from torch import nn
-import torch
 
+from model.modules.features.film import FiLM
 from model.modules.features.grid_features import GridExtractor
 from model.modules.features.present_features import PresentExtractor
-
-PRESENT_COUNT = 6
 
 
 class FeatureExtractor(nn.Module):
@@ -21,9 +19,12 @@ class FeatureExtractor(nn.Module):
 
         # Encodes all presents
         self.present_encoder = PresentExtractor(
-            self.device, num_presents=PRESENT_COUNT, ind_output_features=64)
+            self.device, ind_output_features=64)
 
-        self.features = 256 + 64
+        # Applies FiLM modulation to presents
+        self.modulator = FiLM(64, 256)
+
+        self.features = 256
 
     def forward(self, tensordict):
         """ Module forward functions - gets data features """
@@ -31,6 +32,6 @@ class FeatureExtractor(nn.Module):
         grid_features = self.grid_encoder(tensordict)
         present_features = self.present_encoder(tensordict)
 
-        features = torch.cat(grid_features, present_features)
+        modulated_features = self.modulator(grid_features, present_features)
 
-        return features
+        return modulated_features
