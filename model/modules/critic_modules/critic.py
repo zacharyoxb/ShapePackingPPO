@@ -3,7 +3,7 @@ from tensordict import TensorDict
 from torch import nn
 import torch
 
-from model.modules.features.feature_extractor import FeatureExtractor
+from model.modules.feature_modules.feature_extractor import FeatureExtractor
 
 
 class PresentCritic(nn.Module):

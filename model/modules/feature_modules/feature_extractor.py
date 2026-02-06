@@ -1,9 +1,9 @@
 """ Extracts features from data """
 from torch import nn
 
-from model.modules.features.film import FiLM
-from model.modules.features.grid_features import GridExtractor
-from model.modules.features.present_features import PresentExtractor
+from model.modules.feature_modules.film import FiLM
+from model.modules.feature_modules.grid_features import GridExtractor
+from model.modules.feature_modules.present_features import PresentExtractor
 
 
 class FeatureExtractor(nn.Module):
@@ -22,7 +22,7 @@ class FeatureExtractor(nn.Module):
             self.device, ind_output_features=64)
 
         # Applies FiLM modulation to presents
-        self.modulator = FiLM(64, 256)
+        self.film = FiLM(64, 256)
 
         self.features = 256
 
@@ -32,6 +32,6 @@ class FeatureExtractor(nn.Module):
         grid_features = self.grid_encoder(tensordict)
         present_features = self.present_encoder(tensordict)
 
-        modulated_features = self.modulator(grid_features, present_features)
+        modulated_grids = self.film(grid_features, present_features)
 
-        return modulated_features
+        return modulated_grids
