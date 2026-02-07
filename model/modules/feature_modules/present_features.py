@@ -1,10 +1,11 @@
 """ Extracts features from presents (3x3 shapes) """
 from torch import nn
-import torch
 
 
 class PresentExtractor(nn.Module):
-    """ Outputs tensor representing extracted present features """
+    """ 
+    Outputs tensor representing all features of Present
+    """
 
     def __init__(self, device, ind_output_features=64):
         super().__init__()
@@ -14,7 +15,7 @@ class PresentExtractor(nn.Module):
 
         self.encoder = nn.Sequential(
             # First conv: extract basic shape patterns
-            nn.Conv2d(1, 16, kernel_size=3, padding=1),
+            nn.Conv2d(1, 16, kernel_size=2, padding=1),
             nn.BatchNorm2d(16),
             nn.ReLU(),
 
@@ -30,40 +31,9 @@ class PresentExtractor(nn.Module):
             nn.Linear(128, ind_output_features)  # Final output size
         ).to(self.device)
 
-    def forward(self, tensordict):
+    def forward(self, present):
         """ Module forward function - gets present features """
-        presents = tensordict.get(
-            "presents")
 
-        # If multithreaded, combine into total_batch
-        workers, batches = None, None
-        # If inputs are unbatched
-        if presents.dim() == 3:
-            # Add batch/channel
-            presents = presents.unsqueeze(0).unsqueeze(0)
-        # If inputs are single batched
-        elif presents.dim() == 4:
-            # Add channel
-            presents = presents.unsqueeze(1)
-        # If inputs are double batched
-        elif presents.dim() == 5:
-            # Add channel
-            presents = presents.unsqueeze(2)
-            # combine workers and batches
-            workers, batches = presents.shape[0], presents.shape[1]
-            presents = presents.view(workers * batches, *presents.shape[2:])
-
-        all_present_features = []
-        for i in range(presents.shape[2]):
-            present = presents[:, :, i, :, :]
-            present_features = self.encoder(present)
-            all_present_features.append(present_features)
-
-        # Combine all features
-        present_features = torch.stack(all_present_features, dim=1)
-
-        # Restore dimensions if double batched
-        if workers is not None and batches is not None:
-            present_features = present_features.view(workers, batches, -1)
+        present_features = self.encoder(present)
 
         return present_features

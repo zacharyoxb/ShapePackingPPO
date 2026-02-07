@@ -46,32 +46,9 @@ class GridExtractor(nn.Module):
 
         self.features = 256
 
-    def forward(self, tensordict):
+    def forward(self, grid):
         """ Module forward functions - gets grid features """
-        grid = tensordict.get("grid")
-
-        workers, batches = None, None
-
-        # If input is not batched
-        if grid.dim() == 2:
-            # Add batch/channel
-            grid = grid.unsqueeze(0).unsqueeze(0)
-        # If input is single batched
-        elif grid.dim() == 3:
-            # Add channel
-            grid = grid.unsqueeze(-3)
-        # If input is double batched
-        elif grid.dim() == 4:
-            # Add channel
-            grid = grid.unsqueeze(-3)
-            # combine workers and batches
-            workers, batches = grid.shape[0], grid.shape[1]
-            grid = grid.view(workers * batches, *grid.shape[2:])
 
         grid_features = self.encoder(grid)
-
-        # restore dims if double batched
-        if workers and batches:
-            grid_features = grid_features.view(workers, batches, -1)
 
         return grid_features
