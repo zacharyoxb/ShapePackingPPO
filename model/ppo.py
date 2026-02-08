@@ -22,7 +22,7 @@ from model.modules.critic_modules.critic import PresentCritic
 from model.env import PresentEnv
 from model.config.ppo_config import PPOConfig
 from model.saved_models.save_manager import ModelData, ModelSaveManager
-from data.data_reader import get_data
+from data.data_reader import get_state_td, get_all_present_orientations
 
 
 class PPO:
@@ -34,10 +34,11 @@ class PPO:
             ) else torch.device('cpu')
         )
         self.config = config or PPOConfig()
-        self.input_data = get_data(torch.device("cpu"), input_name)
+        self.input_td = get_state_td(torch.device("cpu"), input_name)
+        self.present_list = get_all_present_orientations(input_name)
 
         # Set up Actor and Critic
-        self.actor_net = PresentActor(self.training_device)
+        self.actor_net = PresentActor(self.present_list, self.training_device)
         td_policy_module = TensorDictModule(
             self.actor_net,
             in_keys=["observation"],
@@ -151,7 +152,7 @@ class PPO:
         logs = defaultdict(list)
 
         # for every set of data in the generator
-        for td in tqdm(self.input_data, desc="Total progress", position=0):
+        for td in tqdm(self.input_td, desc="Total progress", position=0):
             collector = SyncDataCollector(
                 PresentEnv.make_parallel_env,  # type: ignore
                 self.policy_module,
@@ -159,6 +160,7 @@ class PPO:
                 total_frames=self.config.total_frames,
                 create_env_kwargs={
                     "start_state": td,
+                    "presents": self.present_list,
                     "num_workers": 1,
                     "device": torch.device("cpu")
                 },
@@ -202,7 +204,8 @@ class PPO:
                 if i % 10 == 0:
                     with set_interaction_type(InteractionType.DETERMINISTIC), torch.no_grad():
                         # execute a rollout with the trained policy
-                        env = PresentEnv(td, device=self.training_device)
+                        env = PresentEnv(td, self.present_list,
+                                         device=self.training_device)
                         eval_rollout = env.rollout(1000, self.policy_module)
                         logs["eval reward"].append(
                             eval_rollout["next", "reward"].mean().item())

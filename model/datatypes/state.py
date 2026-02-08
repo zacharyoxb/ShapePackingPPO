@@ -9,7 +9,6 @@ import torch
 class State:
     """ Holds current env state """
     grid: torch.Tensor
-    presents: torch.Tensor
     present_count: torch.Tensor
 
 
@@ -17,15 +16,13 @@ def from_tensordict(tensordict: TensorDict) -> list[State]:
     """ Create a list of states from a tensordict """
     # Get current state
     grid = tensordict.get(("observation", "grid")).clone()
-    presents = tensordict.get(("observation", "presents"))
     present_count = tensordict.get(
         ("observation", "present_count")).clone()
 
     # add batch dims
     if grid.ndim == 2:
         grid = grid.unsqueeze(0)
-    if presents.ndim == 3:
-        presents = presents.unsqueeze(0)
+
     if present_count.ndim == 1:
         present_count = present_count.unsqueeze(0)
 
@@ -38,7 +35,6 @@ def from_tensordict(tensordict: TensorDict) -> list[State]:
         states.append(
             State(
                 grid[b],
-                presents[b],
                 present_count[b]
             )
         )

@@ -1,126 +1,51 @@
 """ Actor Policy implementation for use with my present packing environment. """
-from dataclasses import dataclass
 from tensordict import TensorDict
+from tensordict.nn import TensorDictModule
 from torch import nn
 import torch
 
-from model.modules.feature_modules.feature_extractor import FeatureExtractor
-
-
-@dataclass
-class Heads:
-    """ Holds all model heads """
-    present_idx: nn.Sequential
-    rot: nn.Sequential
-    flip: nn.Sequential
-    x_loc: nn.Sequential
-    x_scale: nn.Sequential
-    y_loc: nn.Sequential
-    y_scale: nn.Sequential
+from model.modules.actor_modules.present_selection import PresentSelectionActor
 
 
 class PresentActor(nn.Module):
     """ Policy nn for PresentEnv with spatial awareness """
 
-    def __init__(self, device=torch.device("cpu")):
+    def __init__(self, present_list: list[list[torch.Tensor]], device=torch.device("cpu")):
         super().__init__()
 
         self.flatten = nn.Flatten()
-        self.extractor = FeatureExtractor(device)
+        self.present_selection = PresentSelectionActor(present_list, device)
+
+        obs_to_present = TensorDictModule(
+            self.present_selection,
+            in_keys=["observation"],
+            out_keys=["present_data"]
+        )
+
         self.device = device
-
-        # Output distributions
-        present_idx = nn.Sequential(
-            nn.Linear(self.extractor.features, 128),
-            nn.ReLU(),
-            nn.Linear(128, 6)  # 6 presents
-        ).to(self.device)
-        rot = nn.Sequential(
-            nn.Linear(self.extractor.features, 128),
-            nn.ReLU(),
-            nn.Linear(128, 4)  # 4 rotations
-        ).to(self.device)
-        flip = nn.Sequential(
-            nn.Linear(self.extractor.features, 128),
-            nn.ReLU(),
-            nn.Linear(128, 2)  # 2 binary decisions
-        ).to(self.device)
-        x_loc = nn.Sequential(
-            nn.Linear(self.extractor.features, 64),
-            nn.ReLU(),
-            nn.Linear(64, 1),
-            nn.Tanh()
-        ).to(self.device)
-        x_scale = nn.Sequential(
-            nn.Linear(self.extractor.features, 64),
-            nn.ReLU(),
-            nn.Linear(64, 1),
-            nn.Softplus()
-        ).to(self.device)
-        y_loc = nn.Sequential(
-            nn.Linear(self.extractor.features, 64),
-            nn.ReLU(),
-            nn.Linear(64, 1),
-            nn.Tanh()
-        ).to(self.device)
-        y_scale = nn.Sequential(
-            nn.Linear(self.extractor.features, 64),
-            nn.ReLU(),
-            nn.Linear(64, 1),
-            nn.Softplus()
-        ).to(self.device)
-
-        self.heads = Heads(present_idx, rot, flip, x_loc,
-                           x_scale, y_loc, y_scale)
 
     def forward(self, tensordict):
         """ Forward function for running of nn """
-        # get present count for masking out impossible choices
-        present_count = tensordict.get("present_count")
-
-        # get grid, present features
-        all_features = self.extractor(tensordict)
-
-        # calculate logits
-        present_idx_logits = self.heads.present_idx(all_features)
-        rot_logits = self.heads.rot(all_features)
-        flip_logits = self.heads.flip(all_features)
-
-        # Get outputs for Normal distribution
-        x_loc = self.heads.x_loc(all_features)
-        x_scale = self.heads.x_scale(all_features)
-        y_loc = self.heads.y_loc(all_features)
-        y_scale = self.heads.y_scale(all_features)
-
-        # Squeeze for scalar dims
-        x_loc = x_loc.squeeze(-1)
-        x_scale = x_scale.squeeze(-1)
-        y_loc = y_loc.squeeze(-1)
-        y_scale = y_scale.squeeze(-1)
-
-        # mask out unavailable presents from logits
-        idx_mask = (present_count > 0).float()
-        present_idx_logits = present_idx_logits * idx_mask
 
         batch_size = tensordict.batch_size[0] if tensordict.batch_size else 1
         return TensorDict({
-            "params": {
+            "action": {
                 "present_idx": {
-                    "logits": present_idx_logits
+                    "logits": None
                 },
                 "rot": {
-                    "logits": rot_logits
+                    "logits": None
                 },
                 "flip": {
-                    "logits": flip_logits
+                    "logits": None
                 },
                 "x": {
-                    "loc": x_loc,
-                    "scale": x_scale
+                    "loc": None,
+                    "scale": None
                 },
                 "y": {
-                    "loc": y_loc,
-                    "scale": y_scale
+                    "loc": None,
+                    "scale": None
                 },
             },
         }, batch_size=torch.Size([batch_size]), device=self.device)

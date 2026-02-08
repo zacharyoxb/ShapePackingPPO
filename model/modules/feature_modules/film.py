@@ -4,7 +4,7 @@ import torch
 
 
 class FiLM(nn.Module):
-    """ Outputs a score for each modulated grid from grid and presents"""
+    """ Outputs a score for each modulated grid from grid and presents """
 
     def __init__(self, device, present_feat_dim=64, hidden_dim=256):
         super().__init__()

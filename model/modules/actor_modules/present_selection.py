@@ -2,6 +2,7 @@
 First Actor module. Outputs scores for each present orientation
 and the modulated grid of each orientation. 
 """
+from tensordict import TensorDict
 from torch import nn
 import torch
 
@@ -14,24 +15,29 @@ from model.modules.feature_modules.present_features import PresentExtractor
 class PresentSelectionActor(nn.Module):
     """ Policy nn for PresentEnv to choose which present to place. """
 
-    def __init__(self, device=torch.device("cpu")):
+    def __init__(self, present_list: list[list[torch.Tensor]], device: torch.device):
         super().__init__()
+
+        self.present_features = []
 
         self.grid_extractor = GridExtractor(device)
         self.present_extractor = PresentExtractor(device)
         self.film = FiLM(device)
 
-    def _get_orientation(self, grid_features, present_orient, rot, flip):
-        # Get features of orientation
-        orient_features = self.present_extractor(present_orient)
-        # Apply film layer, get score and modulated grid
-        score, modulated_grid = self.film(grid_features, orient_features)
+        self._get_present_features(present_list)
 
-        return OrientationEntry(rot, flip, score, orient_features, modulated_grid)
+    def _get_present_features(self, present_list):
+        all_features = []
+        for present in present_list:
+            orient_features = []
+            for orient in present:
+                features = self.present_extractor(orient)
+                orient_features.append(features)
+            all_features.append(orient_features)
+        self.present_features = all_features
 
     def _format_data(self, tensordict):
         grid = tensordict.get("grid")
-        presents = tensordict.get("presents")
         present_count = tensordict.get("present_count")
 
         # If multithreaded, combine into total_batch
@@ -40,74 +46,64 @@ class PresentSelectionActor(nn.Module):
         if grid.dim() == 2:
             # Add batch/channel
             grid = grid.unsqueeze(0).unsqueeze(0)
-            presents = presents.unsqueeze(0).unsqueeze(0)
             present_count = present_count.unsqueeze(0)
         # If inputs are single batched
         elif grid.dim() == 3:
             # Add channel
             grid = grid.unsqueeze(1)
-            presents = presents.unsqueeze(1)
         # If inputs are double batched
         elif grid.dim() == 4:
             # Add channel
             grid = grid.unsqueeze(2)
-            presents = presents.unsqueeze(2)
             # combine workers and batches
             workers, batches = grid.shape[0], grid.shape[1]
             grid = grid.view(workers * batches, *grid.shape[2:])
-            presents = presents.view(workers * batches, *presents.shape[2:])
             present_count = present_count.view(
                 workers * batches, *present_count.shape[2:])
 
-        return grid, presents, present_count, workers, batches
+        grid_features = self.grid_extractor(grid)
 
-    def _unique_orientation_gen(self, present):
-        seen = set()
-        flat = present.flatten()
+        return grid_features, present_count, workers, batches
 
-        for k in range(4):
-            rotated = torch.rot90(present, k=k, dims=[-2, -1])
-            flat = rotated.flatten()
-            if flat not in seen:
-                seen.add(flat)
-                yield torch.tensor(k), torch.tensor([]), rotated
+    def _apply_film(self, grid_features, present_features, workers, batches):
+        score, modulated_grid = self.film(
+            grid_features, present_features)
+        if workers and batches:
+            modulated_grid = modulated_grid.view(
+                workers, batches, -1, -1, -1)
 
-        # Flip along vertical axis, horizontal and both
-        for flip_dims in ([-1], [-2], [-1, -2]):
-            flipped = torch.flip(present, dims=flip_dims)
-
-            for k in range(4):
-                # Rotate the flipped version
-                rotated_flipped = torch.rot90(flipped, k=k, dims=[-2, -1])
-                flat = rotated_flipped.flatten()
-                if flat not in seen:
-                    seen.add(flat)
-                    yield torch.tensor(k), torch.tensor([-2]), rotated_flipped
+        return score, modulated_grid
 
     def forward(self, tensordict):
         """ Gets scores for orientation of each present to choose which to place """
         # get data in valid format
-        grid, presents, _present_count, workers, batches = self._format_data(
+        grid_features, present_count, workers, batches = self._format_data(
             tensordict)
 
-        # Get raw grid features
-        grid_features = self.grid_extractor(grid)
+        present_data = {}
 
-        orients = []
+        # Calculate scores for each orientation
+        for present_idx, present_features in enumerate(self.present_features):
+            name = "present" + str(present_idx)
+            if present_count[present_idx] == 0:
+                present_data["present_data"][name] = torch.tensor([])
+                continue
 
-        # Get raw present features for each present
-        for idx in range(presents.shape[-2]):
-            present = presents[:, :, idx, :, :]
-            for rot, flip, oriented in self._unique_orientation_gen(present):
-                present_features = self.present_extractor(oriented)
-                score, modulated_grid = self.film(
-                    grid_features, present_features)
+            present_orients = TensorDict()
+            for orient_idx, orient_features in enumerate(present_features):
+                score, modulated_grid = self._apply_film(
+                    grid_features,
+                    orient_features,
+                    workers,
+                    batches
+                )
+                present_orients[orient_idx] = OrientationEntry(
+                    score,
+                    torch.tensor(present_idx),
+                    torch.tensor(orient_idx),
+                    self.present_features[present_idx][orient_idx],
+                    modulated_grid
+                )
+            present_data["present_data"][name] = TensorDict(present_orients)
 
-                orient = OrientationEntry(
-                    rot, flip, score, present_features, modulated_grid)
-
-                orients.append(orient)
-
-        # If data came in double batched, return it as such
-        if workers and batches:
-            grid_features = grid_features.view(workers, batches, -1)
+        return TensorDict(present_data)

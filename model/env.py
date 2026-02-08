@@ -19,11 +19,13 @@ class PresentEnv(EnvBase):
     def __init__(
             self,
             start_state: TensorDict,
+            present_list: list[list[torch.Tensor]],
             seed=None,
             device=None,
     ):
 
         self.start_state = start_state
+        self.present_list = present_list
 
         super().__init__(device=device)
         self.rng = None
@@ -42,9 +44,7 @@ class PresentEnv(EnvBase):
             "action": {
                 "present_idx": Bounded(low=0, high=MAX_PRESENT_IDX, shape=torch.Size([]),
                                        dtype=torch.uint8),
-                "rot": Bounded(low=0, high=MAX_ROT, shape=torch.Size([]),
-                               dtype=torch.uint8),
-                "flip": Bounded(low=0, high=1, shape=torch.Size([]), dtype=torch.uint8),
+                "present": Bounded(low=0, high=1, shape=torch.Size([]), dtype=torch.float32),
                 "x": Unbounded(shape=torch.Size([]), dtype=torch.int64),
                 "y": Unbounded(shape=torch.Size([]), dtype=torch.int64)
             }
@@ -60,8 +60,6 @@ class PresentEnv(EnvBase):
             "observation": {
                 "grid": Bounded(low=0, high=1, dtype=torch.float32, shape=grid.shape,
                                 device=self.device),
-                "presents": Bounded(low=0, high=1, shape=torch.Size([6, 3, 3]),
-                                    dtype=torch.float32, device=self.device),
                 "present_count": Unbounded(shape=torch.Size([6]), dtype=torch.float32,
                                            device=self.device),
             }
@@ -72,9 +70,7 @@ class PresentEnv(EnvBase):
             "action": {
                 "present_idx": Bounded(low=0, high=MAX_PRESENT_IDX, shape=torch.Size([]),
                                        dtype=torch.uint8),
-                "rot": Bounded(low=0, high=MAX_ROT, shape=torch.Size([]),
-                               dtype=torch.uint8),
-                "flip": Bounded(low=0, high=MAX_FLIP, shape=torch.Size([2]), dtype=torch.uint8),
+                "present": Bounded(low=0, high=1, shape=torch.Size([]), dtype=torch.float32),
                 "x": Bounded(low=1, high=w-2, shape=torch.Size([]), dtype=torch.int64),
                 "y": Bounded(low=1, high=h-2, shape=torch.Size([]), dtype=torch.int64)
             }
@@ -99,14 +95,12 @@ class PresentEnv(EnvBase):
         """ Initialize new episode - returns FIRST observation """
 
         grid = self.start_state.get("grid").clone()
-        presents = self.start_state.get("presents").clone()
         present_count = self.start_state.get("present_count").clone()
 
         # Return as TensorDict with observation keys
         return TensorDict({
             "observation": {
                 "grid": grid,
-                "presents": presents,
                 "present_count": present_count,
             },
         }, device=self.device)
@@ -115,7 +109,7 @@ class PresentEnv(EnvBase):
             self,
             batch_state: state.State,
             batch_action: action.Action
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         w, h = batch_state.grid.shape
 
         # out of bounds check
@@ -124,15 +118,9 @@ class PresentEnv(EnvBase):
         if not in_bounds:
             reward = torch.tensor(-40, dtype=torch.float32)
             done = torch.tensor(True)
-            return batch_state.grid, batch_state.presents, batch_state.present_count, reward, done
+            return batch_state.grid, batch_state.present_count, reward, done
 
-        present = batch_state.presents[int(batch_action.present_idx)].clone()
-        present = torch.rot90(present, int(batch_action.rot))
-
-        if batch_action.flip[0]:
-            present = torch.flip(present, (1,))
-        if batch_action.flip[1]:
-            present = torch.flip(present, (0,))
+        present = batch_action.present
 
         # round x y values
         x, y = round(float(batch_action.x)), round(float(batch_action.y))
@@ -142,7 +130,7 @@ class PresentEnv(EnvBase):
         if torch.any(present * grid_region > 0):
             reward = torch.tensor(-20, dtype=torch.float32)
             done = torch.tensor(True)
-            return batch_state.grid, batch_state.presents, batch_state.present_count, reward, done
+            return batch_state.grid, batch_state.present_count, reward, done
 
         batch_state.present_count[int(batch_action.present_idx)] -= 1
         batch_state.grid[y:y+3, x:x+3] = torch.maximum(grid_region, present)
@@ -156,7 +144,7 @@ class PresentEnv(EnvBase):
             done = torch.tensor(True)
             reward += 200
 
-        return batch_state.grid, batch_state.presents, batch_state.present_count, reward, done
+        return batch_state.grid, batch_state.present_count, reward, done
 
     def _step(self, tensordict: TensorDict) -> TensorDict:
         """ Execute one action - returns NEXT observation + reward + done """
@@ -170,15 +158,13 @@ class PresentEnv(EnvBase):
         ]
 
         # Unzip results
-        grids, presents_list, present_counts, rewards, dones = zip(
+        grids, present_counts, rewards, dones = zip(
             *results)
 
         # If batched, stack results
         batch_size = tensordict.batch_size[0] if tensordict.batch_size else 1
 
         grid = torch.stack(grids) if batch_size > 1 else grids[0]
-        presents = torch.stack(
-            presents_list) if batch_size > 1 else presents_list[0]
         present_count = torch.stack(
             present_counts) if batch_size > 1 else present_counts[0]
         reward = torch.stack(rewards) if batch_size > 1 else rewards[0]
@@ -187,7 +173,6 @@ class PresentEnv(EnvBase):
         return TensorDict({
             "observation": {
                 "grid": grid,
-                "presents": presents,
                 "present_count": present_count
             },
             "reward": reward,
@@ -228,6 +213,7 @@ class PresentEnv(EnvBase):
     def make_parallel_env(
         cls,
         start_state: TensorDict,
+        present_list: list[list[torch.Tensor]],
         num_workers: int,
         device: torch.device | None = None,
     ) -> ParallelEnv:
@@ -256,6 +242,7 @@ class PresentEnv(EnvBase):
 
             return PresentEnv(
                 start_state=worker_start_state,
+                present_list=present_list,
                 seed=worker_seed,
                 device=device
             )

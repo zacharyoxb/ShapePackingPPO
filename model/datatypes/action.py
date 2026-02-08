@@ -2,14 +2,14 @@
 from dataclasses import dataclass
 
 from tensordict import TensorDict
+import torch
 
 
 @dataclass
 class Action:
     """ Holds current action """
     present_idx: int
-    rot: int
-    flip: tuple[int, int]
+    present: torch.Tensor
     x: int
     y: int
 
@@ -17,8 +17,7 @@ class Action:
 def from_tensordict(tensordict: TensorDict) -> list[Action]:
     """ Create a list of actions from a tensordict """
     present_idx = tensordict.get(("action", "present_idx"))
-    rot = tensordict.get(("action", "rot"))
-    flip = tensordict.get(("action", "flip"))
+    present = tensordict.get(("action", "present"))
     x = tensordict.get(("action", "x"))
     y = tensordict.get(("action", "y"))
 
@@ -28,14 +27,13 @@ def from_tensordict(tensordict: TensorDict) -> list[Action]:
     batch_size = tensordict.batch_size[0] if tensordict.batch_size else 1
 
     if batch_size == 1:
-        return [Action(present_idx, rot, flip, x, y)]
+        return [Action(present_idx, present, x, y)]
 
     for b in range(batch_size):
         actions.append(
             Action(
                 present_idx[b],
-                rot[b],
-                flip[b],
+                present[b],
                 x[b],
                 y[b]
             )

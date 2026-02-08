@@ -10,15 +10,15 @@ class OrientationEntry:
     """ 
     The values of an entry of an orientation of a present.
 
-    rot: Amount present was rotated
-    flip: 2 value tensor representing on which axis it was flipped
     score: The score the modulated grid was given
+    present_idx: The index of the present
+    orient_idx: The index of the orientation in the present list
     features: the features of the orientation
     modulated_grid: The grid features to use when placing present
     """
-    rot: torch.Tensor
-    flip: torch.Tensor
     score: torch.Tensor
+    present_idx: torch.Tensor
+    orient_idx: torch.Tensor
     features: torch.Tensor
     modulated_grid: torch.Tensor
 
