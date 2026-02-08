@@ -16,7 +16,7 @@ class PresentActor(nn.Module):
         self.flatten = nn.Flatten()
         self.present_selection = PresentSelectionActor(present_list, device)
 
-        obs_to_present = TensorDictModule(
+        _obs_to_present = TensorDictModule(
             self.present_selection,
             in_keys=["observation"],
             out_keys=["present_data"]
