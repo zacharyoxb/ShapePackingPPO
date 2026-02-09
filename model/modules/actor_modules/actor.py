@@ -4,6 +4,7 @@ from tensordict.nn import TensorDictModule
 from torch import nn
 import torch
 
+from model.modules.actor_modules.position_selection import PresentPositionActor
 from model.modules.actor_modules.present_selection import PresentSelectionActor
 
 
@@ -15,12 +16,17 @@ class PresentActor(nn.Module):
 
         self.flatten = nn.Flatten()
         self.present_selection = PresentSelectionActor(present_list, device)
+        self.position_selection = PresentPositionActor(device)
 
         _obs_to_present = TensorDictModule(
             self.present_selection,
             in_keys=["observation"],
             out_keys=["present_data"]
         )
+
+        # _present_data_transform = TensorDictModule(
+
+        # )
 
         self.device = device
 

@@ -18,15 +18,16 @@ class PresentSelectionActor(nn.Module):
     def __init__(self, present_list: list[list[torch.Tensor]], device: torch.device):
         super().__init__()
 
-        self.present_features = []
+        # this will probably be a problem because of save: leave for now
+        self.all_present_features = []
 
         self.grid_extractor = GridExtractor(device)
         self.present_extractor = PresentExtractor(device)
         self.film = FiLM(device)
 
-        self._get_present_features(present_list)
+        self._feature_init(present_list)
 
-    def _get_present_features(self, present_list):
+    def _feature_init(self, present_list):
         all_features = []
         for present in present_list:
             orient_features = []
@@ -34,7 +35,7 @@ class PresentSelectionActor(nn.Module):
                 features = self.present_extractor(orient)
                 orient_features.append(features)
             all_features.append(orient_features)
-        self.present_features = all_features
+        self.all_present_features = all_features
 
     def _format_data(self, tensordict):
         grid = tensordict.get("grid")
@@ -75,21 +76,19 @@ class PresentSelectionActor(nn.Module):
         return score, modulated_grid
 
     def forward(self, tensordict):
-        """ Gets scores for orientation of each present to choose which to place """
+        """ Gets scores for orientation / modulated grids for them """
         # get data in valid format
         grid_features, present_count, workers, batches = self._format_data(
             tensordict)
 
-        present_data = {}
+        orient_data = {}
+        orient_logits = torch.tensor([])
 
         # Calculate scores for each orientation
-        for present_idx, present_features in enumerate(self.present_features):
-            name = "present" + str(present_idx)
+        for present_idx, present_features in enumerate(self.all_present_features):
             if present_count[present_idx] == 0:
-                present_data["present_data"][name] = torch.tensor([])
                 continue
 
-            present_orients = TensorDict()
             for orient_idx, orient_features in enumerate(present_features):
                 score, modulated_grid = self._apply_film(
                     grid_features,
@@ -97,13 +96,18 @@ class PresentSelectionActor(nn.Module):
                     workers,
                     batches
                 )
-                present_orients[orient_idx] = OrientationEntry(
-                    score,
-                    torch.tensor(present_idx),
-                    torch.tensor(orient_idx),
-                    self.present_features[present_idx][orient_idx],
-                    modulated_grid
+                orient_logits.add(score)
+                orient_data[f"{present_idx}:{orient_idx}"] = TensorDict.from_dataclass(
+                    OrientationEntry(
+                        torch.tensor(present_idx),
+                        torch.tensor(orient_idx),
+                        self.all_present_features[present_idx][orient_idx],
+                        modulated_grid
+                    )
                 )
-            present_data["present_data"][name] = TensorDict(present_orients)
 
-        return TensorDict(present_data)
+        return TensorDict({
+            "present_data": {
+                "logits": orient_logits,
+                "orientations": TensorDict(orient_data)
+            }})

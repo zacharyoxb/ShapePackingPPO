@@ -13,13 +13,11 @@ class OrientationEntry:
     NOTE: This class is for the output of present selection only
     and is not meant to be a representation of an action.
 
-    score: The score the modulated grid was given
     present_idx: The index of the present
     orient_idx: The index of the orientation in the present list
     features: the features of the orientation
     modulated_grid: The grid features to use when placing present
     """
-    score: torch.Tensor
     present_idx: torch.Tensor
     orient_idx: torch.Tensor
     features: torch.Tensor
