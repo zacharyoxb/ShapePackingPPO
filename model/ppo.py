@@ -36,7 +36,7 @@ class PPO:
         self.config = config or PPOConfig()
         self.input_td = get_state_td(input_name)
         self.presents = get_all_present_orientations(
-            input_name)
+            input_name, self.training_device)
 
         # Set up Actor and Critic
         self.actor_net = PresentActor(self.presents, self.training_device)

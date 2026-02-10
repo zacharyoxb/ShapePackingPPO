@@ -79,7 +79,8 @@ def _unique_orientations(present) -> torch.Tensor:
         flat = rotated.flatten()
         if flat not in seen:
             seen.add(flat)
-            rotated = rotated.unsqueeze(0)  # conv dim
+            # batch, conv dim
+            rotated = rotated.unsqueeze(0).unsqueeze(0)
             orientations.append(rotated)
 
     # Flip along vertical axis, horizontal and both
@@ -92,13 +93,14 @@ def _unique_orientations(present) -> torch.Tensor:
             flat = rotated_flipped.flatten()
             if flat not in seen:
                 seen.add(flat)
-                rotated_flipped = rotated_flipped.unsqueeze(0)  # conv dim
+                # batch, conv dim
+                rotated_flipped = rotated_flipped.unsqueeze(0).unsqueeze(0)
                 orientations.append(rotated_flipped)
 
     return torch.stack(orientations)
 
 
-def get_all_present_orientations(file_name="input.txt") -> torch.Tensor:
+def get_all_present_orientations(file_name="input.txt", device=torch.device("cpu")) -> torch.Tensor:
     """ Outputs all orientations of all presents, with no repeats """
     presents = _get_presents(file_name)
 
@@ -109,4 +111,5 @@ def get_all_present_orientations(file_name="input.txt") -> torch.Tensor:
         all_orientations.append(present_orients)
 
     orientations = torch.stack(all_orientations)
+    orientations = orientations.to(device)
     return orientations

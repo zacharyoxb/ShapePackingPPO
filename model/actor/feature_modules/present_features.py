@@ -26,15 +26,13 @@ class PresentExtractor(nn.Module):
 
             # Flatten and project to desired size
             nn.Flatten(),
-            nn.Linear(32 * 3 * 3, 128),  # 32 channels * 3x3 = 288 → 128
+            nn.Linear(512, 128),
             nn.ReLU(),
             nn.Linear(128, ind_output_features)  # Final output size
         ).to(self.device)
 
     def forward(self, present):
         """ Module forward function - gets present features """
-
-        present.to(self.device)
 
         present_features = self.encoder(present)
 
