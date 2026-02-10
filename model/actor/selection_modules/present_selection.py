@@ -18,8 +18,9 @@ class PresentSelectionActor(nn.Module):
     def __init__(self, presents: torch.Tensor, device: torch.device):
         super().__init__()
 
-        # this will probably be a problem because of save: leave for now
-        self.all_present_features = []
+        # Presents shouldn't be learnable/modifiable nor in state_dict
+        self.register_buffer("all_present_features",
+                             torch.tensor([]), persistent=False)
 
         self.grid_extractor = GridExtractor(device)
         self.present_extractor = PresentExtractor(device)
@@ -38,8 +39,11 @@ class PresentSelectionActor(nn.Module):
 
                 features = self.present_extractor(orient)
                 orient_features.append(features)
-            all_features.append(orient_features)
-        self.all_present_features = all_features
+
+            present_features = torch.stack(orient_features)
+            all_features.append(present_features)
+
+        self._all_present_features = torch.stack(all_features)
 
     def _format_data(self, tensordict):
         grid = tensordict.get("grid")
@@ -85,11 +89,11 @@ class PresentSelectionActor(nn.Module):
         grid_features, present_count, workers, batches = self._format_data(
             tensordict)
 
-        orient_data = {}
         orient_logits = torch.tensor([])
+        orient_data = []
 
         # Calculate scores for each orientation
-        for present_idx, present_features in enumerate(self.all_present_features):
+        for present_idx, present_features in enumerate(self._all_present_features):
             if present_count[present_idx] == 0:
                 continue
 
@@ -101,17 +105,19 @@ class PresentSelectionActor(nn.Module):
                     batches
                 )
                 orient_logits.add(score)
-                orient_data[f"{present_idx}:{orient_idx}"] = TensorDict.from_dataclass(
-                    OrientationEntry(
-                        torch.tensor(present_idx),
-                        torch.tensor(orient_idx),
-                        self.all_present_features[present_idx][orient_idx],
-                        modulated_grid
+                orient_data.append(
+                    TensorDict.from_dataclass(
+                        OrientationEntry(
+                            torch.tensor(present_idx),
+                            torch.tensor(orient_idx),
+                            self._all_present_features[present_idx][orient_idx],
+                            modulated_grid
+                        )
                     )
                 )
 
+        choice_idx = torch.multinomial(orient_logits, len(orient_data))
+
         return TensorDict({
-            "present_data": {
-                "logits": orient_logits,
-                "orientations": TensorDict(orient_data)
-            }})
+            "present_data": orient_data[choice_idx]
+        })

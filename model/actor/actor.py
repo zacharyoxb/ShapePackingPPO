@@ -18,7 +18,7 @@ class PresentActor(nn.Module):
         self.present_selection = PresentSelectionActor(presents, device)
         self.position_selection = PresentPositionActor(device)
 
-        _obs_to_present = TensorDictModule(
+        _present_select = TensorDictModule(
             self.present_selection,
             in_keys=["observation"],
             out_keys=["present_data"]
