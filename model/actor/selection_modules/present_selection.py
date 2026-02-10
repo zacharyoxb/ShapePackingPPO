@@ -6,10 +6,10 @@ from tensordict import TensorDict
 from torch import nn
 import torch
 
-from model.modules.actor_modules.td_utils import OrientationEntry
-from model.modules.feature_modules.film import FiLM
-from model.modules.feature_modules.grid_features import GridExtractor
-from model.modules.feature_modules.present_features import PresentExtractor
+from model.actor.selection_modules.td_utils import OrientationEntry
+from model.actor.feature_modules.film import FiLM
+from model.actor.feature_modules.grid_features import GridExtractor
+from model.actor.feature_modules.present_features import PresentExtractor
 
 
 class PresentSelectionActor(nn.Module):

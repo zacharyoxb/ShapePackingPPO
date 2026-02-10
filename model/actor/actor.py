@@ -4,8 +4,8 @@ from tensordict.nn import TensorDictModule
 from torch import nn
 import torch
 
-from model.modules.actor_modules.position_selection import PresentPositionActor
-from model.modules.actor_modules.present_selection import PresentSelectionActor
+from model.actor.selection_modules.position_selection import PresentPositionActor
+from model.actor.selection_modules.present_selection import PresentSelectionActor
 
 
 class PresentActor(nn.Module):
