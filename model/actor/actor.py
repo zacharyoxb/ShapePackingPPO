@@ -24,9 +24,11 @@ class PresentActor(nn.Module):
             out_keys=["present_data"]
         )
 
-        # _present_data_transform = TensorDictModule(
-
-        # )
+        _present_data_transform = TensorDictModule(
+            self.position_selection,
+            in_keys=["present_data"],
+            out_keys=["action"]
+        )
 
         self.device = device
 

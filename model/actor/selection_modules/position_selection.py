@@ -16,4 +16,4 @@ class PresentPositionActor(nn.Module):
         # Normal coordinate gen networks go here
 
     def forward(self, tensordict):
-        """ Use td to choose present, predict placement, return action """
+        """ Choose a placement position for the selected present in present_data """
