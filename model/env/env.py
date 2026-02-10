@@ -4,9 +4,10 @@ from tensordict import TensorDict
 
 from torchrl.data import (Bounded, Composite, Unbounded,
                           Categorical)
-from torchrl.envs import EnvBase, ParallelEnv
+from torchrl.envs import EnvBase, ParallelEnv, TransformedEnv
 
 from model.datatypes import action, state
+from model.env.transform_dims import PresentEnvTransform
 
 MAX_PRESENT_IDX = 5
 MAX_ROT = 3
@@ -210,6 +211,30 @@ class PresentEnv(EnvBase):
         return data
 
     @classmethod
+    def make_transformed_env(
+        cls,
+        start_state: TensorDict,
+        present_list: list[list[torch.Tensor]],
+        seed: int | float | None = None,
+        device: torch.device | None = None,
+    ) -> TransformedEnv:
+        """ 
+        Creates a TransformedEnv with a PresentEnv inside
+        for easy batch and dimension handling.
+        """
+        worker_start_state = start_state.clone()
+        worker_start_state = worker_start_state.to(device)
+
+        env = PresentEnv(
+            start_state=worker_start_state,
+            present_list=present_list,
+            seed=seed,
+            device=device
+        )
+
+        return TransformedEnv(env, PresentEnvTransform())
+
+    @classmethod
     def make_parallel_env(
         cls,
         start_state: TensorDict,
@@ -240,7 +265,7 @@ class PresentEnv(EnvBase):
             worker_seed = seeds[worker_id] if worker_id < len(
                 seeds) else seeds[0]
 
-            return PresentEnv(
+            return cls.make_transformed_env(
                 start_state=worker_start_state,
                 present_list=present_list,
                 seed=worker_seed,

@@ -17,8 +17,8 @@ from tensordict.nn import (
     InteractionType
 )
 
-from model.modules.actor.actor import PresentActor
-from model.modules.critic.critic import PresentCritic
+from model.actor import PresentActor
+from model.critic import PresentCritic
 from model.env import PresentEnv
 from model.config.ppo_config import PPOConfig
 from model.saved_models.save_manager import ModelData, ModelSaveManager
