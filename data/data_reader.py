@@ -28,7 +28,7 @@ def _get_placement_info(file_name="input.txt") -> list[tuple[int, int, torch.Ten
     return args
 
 
-def get_state_td(device, file_name="input.txt") -> list[TensorDict]:
+def get_state_td(file_name="input.txt", device=torch.device("cpu")) -> list[TensorDict]:
     """ Collates all  into a dataset """
     placement_info = _get_placement_info(file_name)
 
@@ -68,7 +68,7 @@ def _get_presents(file_name) -> torch.Tensor:
     return torch.stack(extracted_present_tensors)
 
 
-def _unique_orientations(present):
+def _unique_orientations(present) -> torch.Tensor:
     seen = set()
     flat = present.flatten()
 
@@ -79,6 +79,7 @@ def _unique_orientations(present):
         flat = rotated.flatten()
         if flat not in seen:
             seen.add(flat)
+            rotated = rotated.unsqueeze(0)  # conv dim
             orientations.append(rotated)
 
     # Flip along vertical axis, horizontal and both
@@ -91,12 +92,13 @@ def _unique_orientations(present):
             flat = rotated_flipped.flatten()
             if flat not in seen:
                 seen.add(flat)
+                rotated_flipped = rotated_flipped.unsqueeze(0)  # conv dim
                 orientations.append(rotated_flipped)
 
-    return orientations
+    return torch.stack(orientations)
 
 
-def get_all_present_orientations(file_name="input.txt") -> list[list[torch.Tensor]]:
+def get_all_present_orientations(file_name="input.txt") -> torch.Tensor:
     """ Outputs all orientations of all presents, with no repeats """
     presents = _get_presents(file_name)
 
@@ -106,4 +108,5 @@ def get_all_present_orientations(file_name="input.txt") -> list[list[torch.Tenso
         present_orients = _unique_orientations(presents[idx, :, :])
         all_orientations.append(present_orients)
 
-    return all_orientations
+    orientations = torch.stack(all_orientations)
+    return orientations

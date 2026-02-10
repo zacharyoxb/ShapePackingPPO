@@ -11,11 +11,11 @@ from model.actor.selection_modules.present_selection import PresentSelectionActo
 class PresentActor(nn.Module):
     """ Policy nn for PresentEnv with spatial awareness """
 
-    def __init__(self, present_list: list[list[torch.Tensor]], device=torch.device("cpu")):
+    def __init__(self, presents: torch.Tensor, device=torch.device("cpu")):
         super().__init__()
 
         self.flatten = nn.Flatten()
-        self.present_selection = PresentSelectionActor(present_list, device)
+        self.present_selection = PresentSelectionActor(presents, device)
         self.position_selection = PresentPositionActor(device)
 
         _obs_to_present = TensorDictModule(

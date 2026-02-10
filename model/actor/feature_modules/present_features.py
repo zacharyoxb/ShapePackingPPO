@@ -34,6 +34,8 @@ class PresentExtractor(nn.Module):
     def forward(self, present):
         """ Module forward function - gets present features """
 
+        present.to(self.device)
+
         present_features = self.encoder(present)
 
         return present_features

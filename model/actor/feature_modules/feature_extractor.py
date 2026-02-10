@@ -1,9 +1,9 @@
 """ Extracts features from data """
 from torch import nn
 
-from model.modules.feature_modules.film import FiLM
-from model.modules.feature_modules.grid_features import GridExtractor
-from model.modules.feature_modules.present_features import PresentExtractor
+from model.actor.feature_modules.film import FiLM
+from model.actor.feature_modules.grid_features import GridExtractor
+from model.actor.feature_modules.present_features import PresentExtractor
 
 
 class FeatureExtractor(nn.Module):

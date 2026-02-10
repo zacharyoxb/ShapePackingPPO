@@ -34,11 +34,12 @@ class PPO:
             ) else torch.device('cpu')
         )
         self.config = config or PPOConfig()
-        self.input_td = get_state_td(torch.device("cpu"), input_name)
-        self.present_list = get_all_present_orientations(input_name)
+        self.input_td = get_state_td(input_name)
+        self.presents = get_all_present_orientations(
+            input_name)
 
         # Set up Actor and Critic
-        self.actor_net = PresentActor(self.present_list, self.training_device)
+        self.actor_net = PresentActor(self.presents, self.training_device)
         td_policy_module = TensorDictModule(
             self.actor_net,
             in_keys=["observation"],
@@ -160,7 +161,7 @@ class PPO:
                 total_frames=self.config.total_frames,
                 create_env_kwargs={
                     "start_state": td,
-                    "presents": self.present_list,
+                    "presents": self.presents,
                     "num_workers": 1,
                     "device": torch.device("cpu")
                 },
@@ -204,7 +205,7 @@ class PPO:
                 if i % 10 == 0:
                     with set_interaction_type(InteractionType.DETERMINISTIC), torch.no_grad():
                         # execute a rollout with the trained policy
-                        env = PresentEnv(td, self.present_list,
+                        env = PresentEnv(td, self.presents,
                                          device=self.training_device)
                         eval_rollout = env.rollout(1000, self.policy_module)
                         logs["eval reward"].append(

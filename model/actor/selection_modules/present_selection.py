@@ -15,7 +15,7 @@ from model.actor.feature_modules.present_features import PresentExtractor
 class PresentSelectionActor(nn.Module):
     """ Policy nn for PresentEnv to choose which present to place. """
 
-    def __init__(self, present_list: list[list[torch.Tensor]], device: torch.device):
+    def __init__(self, presents: torch.Tensor, device: torch.device):
         super().__init__()
 
         # this will probably be a problem because of save: leave for now
@@ -25,13 +25,17 @@ class PresentSelectionActor(nn.Module):
         self.present_extractor = PresentExtractor(device)
         self.film = FiLM(device)
 
-        self._feature_init(present_list)
+        self._feature_init(presents)
 
-    def _feature_init(self, present_list):
+    def _feature_init(self, presents):
         all_features = []
-        for present in present_list:
+
+        for present in presents:
             orient_features = []
             for orient in present:
+                # add channel dim
+                present = present.unsqueeze(0)
+
                 features = self.present_extractor(orient)
                 orient_features.append(features)
             all_features.append(orient_features)

@@ -20,13 +20,13 @@ class PresentEnv(EnvBase):
     def __init__(
             self,
             start_state: TensorDict,
-            present_list: list[list[torch.Tensor]],
+            presents: torch.Tensor,
             seed=None,
             device=None,
     ):
 
         self.start_state = start_state
-        self.present_list = present_list
+        self.presents = presents
 
         super().__init__(device=device)
         self.rng = None
@@ -214,7 +214,7 @@ class PresentEnv(EnvBase):
     def make_transformed_env(
         cls,
         start_state: TensorDict,
-        present_list: list[list[torch.Tensor]],
+        presents: torch.Tensor,
         seed: int | float | None = None,
         device: torch.device | None = None,
     ) -> TransformedEnv:
@@ -227,7 +227,7 @@ class PresentEnv(EnvBase):
 
         env = PresentEnv(
             start_state=worker_start_state,
-            present_list=present_list,
+            presents=presents,
             seed=seed,
             device=device
         )
@@ -238,7 +238,7 @@ class PresentEnv(EnvBase):
     def make_parallel_env(
         cls,
         start_state: TensorDict,
-        present_list: list[list[torch.Tensor]],
+        presents: torch.Tensor,
         num_workers: int,
         device: torch.device | None = None,
     ) -> ParallelEnv:
@@ -267,7 +267,7 @@ class PresentEnv(EnvBase):
 
             return cls.make_transformed_env(
                 start_state=worker_start_state,
-                present_list=present_list,
+                presents=presents,
                 seed=worker_seed,
                 device=device
             )
