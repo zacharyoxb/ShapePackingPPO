@@ -67,16 +67,19 @@ class PresentSelectionActor(nn.Module):
 
                 orient_logits.add(score)
                 orient_data.append(
-                    OrientationEntry(
-                        torch.tensor(present_idx),
-                        torch.tensor(orient_idx),
-                        self._all_present_features[present_idx][orient_idx],
-                        modulated_grid
+                    TensorDict.from_dataclass(
+                        OrientationEntry(
+                            torch.tensor(present_idx),
+                            torch.tensor(orient_idx),
+                            self._all_present_features[present_idx][orient_idx],
+                            modulated_grid
+                        )
                     )
                 )
 
-        choice_idx = torch.multinomial(orient_logits, len(orient_data))
-
         return TensorDict({
-            "present_data": TensorDict.from_dataclass(orient_data[choice_idx])
+            "orient_data": {
+                "chosen_orient": orient_logits,
+                "orients": TensorDict.from_list(orient_data)
+            }
         })

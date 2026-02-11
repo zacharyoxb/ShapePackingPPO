@@ -7,11 +7,11 @@ class PresentExtractor(nn.Module):
     Outputs tensor representing all features of Present
     """
 
-    def __init__(self, device, ind_output_features=64):
+    def __init__(self, device, output_features=64):
         super().__init__()
 
         self.device = device
-        self.output_features = ind_output_features
+        self.output_features = output_features
 
         self.encoder = nn.Sequential(
             # First conv: extract basic shape patterns
@@ -28,7 +28,7 @@ class PresentExtractor(nn.Module):
             nn.Flatten(),
             nn.Linear(512, 128),
             nn.ReLU(),
-            nn.Linear(128, ind_output_features)  # Final output size
+            nn.Linear(128, output_features)  # Final output size
         ).to(self.device)
 
     def forward(self, present):

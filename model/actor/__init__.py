@@ -1,2 +1,2 @@
 """ Actor files """
-from .actor import PresentActor
+from .actor import PresentActorSeq

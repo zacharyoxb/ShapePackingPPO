@@ -4,20 +4,17 @@ from collections import defaultdict
 
 import torch
 from tqdm import tqdm
-from torch import distributions as d
 from torchrl.data import ReplayBuffer, LazyMemmapStorage, SamplerWithoutReplacement
-from torchrl.modules import ProbabilisticActor
 from torchrl.collectors import SyncDataCollector
 from torchrl.objectives.value import GAE
 from torchrl.objectives import ClipPPOLoss
 from tensordict.nn import (
     TensorDictModule,
-    CompositeDistribution,
     set_interaction_type,
     InteractionType
 )
 
-from model.actor import PresentActor
+from model.actor import PresentActorSeq
 from model.critic import PresentCritic
 from model.env import PresentEnv
 from model.config.ppo_config import PPOConfig
@@ -39,36 +36,8 @@ class PPO:
             input_name, self.training_device)
 
         # Set up Actor and Critic
-        self.actor_net = PresentActor(self.presents, self.training_device)
-        td_policy_module = TensorDictModule(
-            self.actor_net,
-            in_keys=["observation"],
-            out_keys=["params"]
-        )
-
-        self.policy_module = ProbabilisticActor(
-            module=td_policy_module,
-            spec=PresentEnv.get_action_spec(),
-            in_keys=["params"],
-            distribution_class=CompositeDistribution,
-            distribution_kwargs={
-                "distribution_map": {
-                    "present_idx": d.Categorical,
-                    "rot": d.Categorical,
-                    "flip": d.Bernoulli,
-                    "x": d.Normal,
-                    "y": d.Normal
-                },
-                "name_map": {
-                    "present_idx": ("action", "present_idx"),
-                    "rot": ("action", "rot"),
-                    "flip": ("action", "flip"),
-                    "x": ("action", "x"),
-                    "y": ("action", "y")
-                }
-            },
-            return_log_prob=True
-        )
+        self.policy_module = PresentActorSeq(
+            self.presents, self.training_device)
 
         self.value_net = PresentCritic(self.training_device)
         self.value_module = TensorDictModule(
@@ -114,7 +83,6 @@ class PPO:
         best = manager.load_best()
 
         if best:
-            self.actor_net.load_state_dict(best.actor_state)
             self.value_net.load_state_dict(best.critic_state)
             self.policy_module.load_state_dict(best.policy_state)
             self.value_module.load_state_dict(best.value_state)
@@ -238,7 +206,6 @@ class PPO:
 
         data = ModelData(
             logs['reward'][-1],
-            self.actor_net.state_dict(),
             self.value_net.state_dict(),
             self.policy_module.state_dict(),
             self.value_module.state_dict(),

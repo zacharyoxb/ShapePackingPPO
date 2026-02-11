@@ -1,59 +1,71 @@
 """ Actor Policy implementation for use with my present packing environment. """
-from tensordict import TensorDict
-from tensordict.nn import TensorDictModule
-from torch import nn
+from tensordict.nn import (
+    ProbabilisticTensorDictSequential,
+    ProbabilisticTensorDictModule,
+    TensorDictModule,
+    OneHotCategorical,
+    CompositeDistribution
+)
 import torch
+from torch import nn
+from torch import distributions as d
 
 from model.actor.selection_modules.position_selection import PresentPositionActor
 from model.actor.selection_modules.present_selection import PresentSelectionActor
 
 
-class PresentActor(nn.Module):
+class PresentActorSeq(ProbabilisticTensorDictSequential):
     """ Policy nn for PresentEnv with spatial awareness """
 
     def __init__(self, presents: torch.Tensor, device=torch.device("cpu")):
-        super().__init__()
 
         self.flatten = nn.Flatten()
         self.present_selection = PresentSelectionActor(presents, device)
-        self.position_selection = PresentPositionActor(device)
+        self.position_selection = PresentPositionActor(presents, device)
 
-        _present_select = TensorDictModule(
+        present_select_prob = TensorDictModule(
             self.present_selection,
             in_keys=["observation"],
-            out_keys=["present_data"]
+            out_keys=["orient_data"]
         )
 
-        _present_data_transform = TensorDictModule(
+        present_select = ProbabilisticTensorDictModule(
+            in_keys=["orient_data"],
+            out_keys=["orient_mask"],
+            distribution_class=OneHotCategorical,
+            return_log_prob=True
+        )
+
+        present_pos_prob = TensorDictModule(
             self.position_selection,
-            in_keys=["present_data"],
-            out_keys=["action"]
+            in_keys=["orient_data", "orient_mask"],
+            out_keys=["action", "pos_probs"],
         )
 
-        self.device = device
-
-    def forward(self, tensordict):
-        """ Forward function for running of nn """
-
-        batch_size = tensordict.batch_size[0] if tensordict.batch_size else 1
-        return TensorDict({
-            "action": {
-                "present_idx": {
-                    "logits": None
+        present_pos = ProbabilisticTensorDictModule(
+            in_keys=["pos_probs"],
+            distribution_class=CompositeDistribution,
+            distribution_kwargs={
+                "distribution_map": {
+                    "x": d.Normal,
+                    "y": d.Normal
                 },
-                "rot": {
-                    "logits": None
-                },
-                "flip": {
-                    "logits": None
-                },
-                "x": {
-                    "loc": None,
-                    "scale": None
-                },
-                "y": {
-                    "loc": None,
-                    "scale": None
-                },
+                "name_map": {
+                    "x": ("action", "x"),
+                    "y": ("action", "y")
+                }
             },
-        }, batch_size=torch.Size([batch_size]), device=self.device)
+            return_log_prob=True
+        )
+
+        # change to buffer
+        self.presents = presents
+
+        super().__init__(
+            [
+                present_select_prob,
+                present_select,
+                present_pos_prob,
+                present_pos
+            ]
+        )

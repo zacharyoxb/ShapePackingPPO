@@ -15,12 +15,12 @@ class OrientationEntry:
 
     present_idx: The index of the present
     orient_idx: The index of the orientation in the present list
-    features: the features of the orientation
+    orient_features: the features of the orientation
     modulated_grid: The grid features to use when placing present
     """
     present_idx: torch.Tensor
     orient_idx: torch.Tensor
-    features: torch.Tensor
+    orient_features: torch.Tensor
     modulated_grid: torch.Tensor
 
 

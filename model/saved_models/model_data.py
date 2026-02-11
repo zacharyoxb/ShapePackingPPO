@@ -8,7 +8,6 @@ import torch
 class ModelData:
     """ Layout of saved / checkpointed model data """
     avg_reward: torch.Tensor
-    actor_state: dict
     critic_state: dict
     policy_state: dict
     value_state: dict
