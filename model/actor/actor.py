@@ -26,13 +26,12 @@ class PresentActorSeq(ProbabilisticTensorDictSequential):
         present_features=64
     ):
 
-        self.flatten = nn.Flatten()
-        self.present_selection = PresentSelectionActor(presents, device)
-        self.position_selection = PresentPositionActor(
+        present_selection = PresentSelectionActor(presents, device)
+        position_selection = PresentPositionActor(
             presents, device, grid_features=grid_features, present_features=present_features)
 
         present_select_prob = TensorDictModule(
-            self.present_selection,
+            present_selection,
             in_keys=["observation"],
             out_keys=["orient_data", "critic_data"]
         )
@@ -45,7 +44,7 @@ class PresentActorSeq(ProbabilisticTensorDictSequential):
         )
 
         present_pos_prob = TensorDictModule(
-            self.position_selection,
+            position_selection,
             in_keys=["orient_data", "orient_mask"],
             out_keys=["action", "pos_probs"],
         )
@@ -74,3 +73,4 @@ class PresentActorSeq(ProbabilisticTensorDictSequential):
                 present_pos
             ]
         )
+        self.flatten = nn.Flatten()

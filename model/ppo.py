@@ -128,7 +128,6 @@ class PPO:
                 total_frames=self.config.total_frames,
                 create_env_kwargs={
                     "start_state": td,
-                    "presents": self.presents,
                     "num_workers": 1,
                     "device": torch.device("cpu")
                 },

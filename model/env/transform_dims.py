@@ -1,6 +1,6 @@
 """ Adds and removes dims to make them consistent when selecting / extracting features """
 
-from tensordict import TensorDict
+from tensordict import TensorDict, TensorDictBase
 from torch import Tensor
 from torchrl.envs.transforms import Transform
 
@@ -18,6 +18,9 @@ class PresentEnvTransform(Transform):
     def __init__(self):
         super().__init__(in_keys=["observation"], out_keys=[
             "observation"], in_keys_inv=["action", "batch_dims"], out_keys_inv=["action"])
+
+    def _call(self, next_tensordict: TensorDictBase) -> TensorDictBase:
+        return super()._call(next_tensordict)
 
     def forward(self, tensordict: TensorDict) -> TensorDict:
         grid = tensordict.get("grid")
@@ -44,15 +47,15 @@ class PresentEnvTransform(Transform):
             present_count = present_count.view(
                 workers * batches, *present_count.shape[2:])
 
-        tensordict["observation"] = {
+        tensordict.set("observation", {
             "grid": grid,
             "present_count": present_count
-        }
+        })
 
-        tensordict["batch_dims"] = {
+        tensordict.set("batch_dims", {
             "workers": workers,
             "batches": batches
-        }
+        })
 
         return tensordict
 

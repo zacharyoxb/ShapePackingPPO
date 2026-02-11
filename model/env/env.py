@@ -4,7 +4,7 @@ from tensordict import TensorDict
 
 from torchrl.data import (Bounded, Composite, Unbounded,
                           Categorical)
-from torchrl.envs import EnvBase, ParallelEnv, TransformedEnv
+from torchrl.envs import EnvBase, ParallelEnv
 
 from model.datatypes import action, state
 from model.env.transform_dims import PresentEnvTransform
@@ -23,11 +23,11 @@ class PresentEnv(EnvBase):
             seed=None,
             device=None,
     ):
-
-        self.start_state = start_state
-
         super().__init__(device=device)
+        self.start_state = start_state
         self.rng = None
+
+        self.append_transform(PresentEnvTransform())
 
         if seed is None:
             seed = torch.empty((), dtype=torch.int64).random_().item()
@@ -209,28 +209,6 @@ class PresentEnv(EnvBase):
         return data
 
     @classmethod
-    def make_transformed_env(
-        cls,
-        start_state: TensorDict,
-        seed: int | float | None = None,
-        device: torch.device | None = None,
-    ) -> TransformedEnv:
-        """ 
-        Creates a TransformedEnv with a PresentEnv inside
-        for easy batch and dimension handling.
-        """
-        worker_start_state = start_state.clone()
-        worker_start_state = worker_start_state.to(device)
-
-        env = PresentEnv(
-            start_state=worker_start_state,
-            seed=seed,
-            device=device
-        )
-
-        return TransformedEnv(env, PresentEnvTransform())
-
-    @classmethod
     def make_parallel_env(
         cls,
         start_state: TensorDict,
@@ -260,7 +238,7 @@ class PresentEnv(EnvBase):
             worker_seed = seeds[worker_id] if worker_id < len(
                 seeds) else seeds[0]
 
-            return cls.make_transformed_env(
+            return PresentEnv(
                 start_state=worker_start_state,
                 seed=worker_seed,
                 device=device
