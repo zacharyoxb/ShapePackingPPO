@@ -20,11 +20,8 @@ class PresentEnvTransform(Transform):
             "observation"], in_keys_inv=["action", "batch_dims"], out_keys_inv=["action"])
 
     def _call(self, next_tensordict: TensorDictBase) -> TensorDictBase:
-        return super()._call(next_tensordict)
-
-    def forward(self, tensordict: TensorDict) -> TensorDict:
-        grid = tensordict.get("grid")
-        present_count = tensordict.get("present_count")
+        grid = next_tensordict.get("grid")
+        present_count = next_tensordict.get("present_count")
 
         # If multithreaded, combine into total_batch
         workers, batches = None, None
@@ -47,17 +44,25 @@ class PresentEnvTransform(Transform):
             present_count = present_count.view(
                 workers * batches, *present_count.shape[2:])
 
-        tensordict.set("observation", {
+        next_tensordict.set("observation", {
             "grid": grid,
             "present_count": present_count
         })
 
-        tensordict.set("batch_dims", {
+        next_tensordict.set("batch_dims", {
             "workers": workers,
             "batches": batches
         })
 
-        return tensordict
+        return next_tensordict
+
+    def _reset(
+        self, tensordict: TensorDictBase, tensordict_reset: TensorDictBase
+    ) -> TensorDictBase:
+        return self._call(tensordict_reset)
+
+    def forward(self, tensordict: TensorDict) -> TensorDict:
+        return self._call(tensordict)
 
     def inv(self, tensordict: TensorDict) -> TensorDict:
         workers = tensordict.get("workers")
