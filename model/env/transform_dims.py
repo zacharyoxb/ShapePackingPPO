@@ -17,14 +17,18 @@ class PresentEnvTransform(Transform):
 
     def __init__(self):
         super().__init__(in_keys=["observation"], out_keys=[
-            "observation"], in_keys_inv=["action", "batch_dims"], out_keys_inv=["action"])
+            "observation"], in_keys_inv=["action"], out_keys_inv=["action"])
+
+        self.workers = None
+        self.batches = None
 
     def _call(self, next_tensordict: TensorDictBase) -> TensorDictBase:
-        grid = next_tensordict.get("grid")
-        present_count = next_tensordict.get("present_count")
+        grid = next_tensordict.get(("observation", "grid"))
+        present_count = next_tensordict.get(("observation", "present_count"))
 
-        # If multithreaded, combine into total_batch
-        workers, batches = None, None
+        self.workers = None
+        self.batches = None
+
         # If inputs are unbatched
         if grid.dim() == 2:
             # Add batch/channel
@@ -39,19 +43,14 @@ class PresentEnvTransform(Transform):
             # Add channel
             grid = grid.unsqueeze(2)
             # combine workers and batches
-            workers, batches = grid.shape[0], grid.shape[1]
-            grid = grid.view(workers * batches, *grid.shape[2:])
+            self.workers, self.batches = grid.shape[0], grid.shape[1]
+            grid = grid.view(self.workers * self.batches, *grid.shape[2:])
             present_count = present_count.view(
-                workers * batches, *present_count.shape[2:])
+                self.workers * self.batches, *present_count.shape[2:])
 
         next_tensordict.set("observation", {
             "grid": grid,
             "present_count": present_count
-        })
-
-        next_tensordict.set("batch_dims", {
-            "workers": workers,
-            "batches": batches
         })
 
         return next_tensordict
@@ -65,10 +64,8 @@ class PresentEnvTransform(Transform):
         return self._call(tensordict)
 
     def inv(self, tensordict: TensorDict) -> TensorDict:
-        workers = tensordict.get("workers")
-        batches = tensordict.get("batches")
 
-        if not workers or not batches:
+        if not self.workers or not self.batches:
             return tensordict
 
         present_idx = tensordict.get("present_idx")
@@ -77,15 +74,15 @@ class PresentEnvTransform(Transform):
         y = tensordict.get("y")
 
         present_idx = present_idx.view(
-            workers, batches, -1)
+            self.workers, self.batches, -1)
         present = present.view(
-            workers, batches, -1, -1
+            self.workers, self.batches, -1, -1
         )
         x = x.view(
-            workers, batches, -1
+            self.workers, self.batches, -1
         )
         y = y.view(
-            workers, batches, -1
+            self.workers, self.batches, -1
         )
 
         tensordict.set("action", {
