@@ -17,16 +17,24 @@ from model.actor.selection_modules.present_selection import PresentSelectionActo
 class PresentActorSeq(ProbabilisticTensorDictSequential):
     """ Policy nn for PresentEnv with spatial awareness """
 
-    def __init__(self, presents: torch.Tensor, device=torch.device("cpu")):
+    def __init__(
+        self,
+        presents: torch.Tensor,
+        device=torch.device("cpu"),
+        *,
+        grid_features=256,
+        present_features=64
+    ):
 
         self.flatten = nn.Flatten()
         self.present_selection = PresentSelectionActor(presents, device)
-        self.position_selection = PresentPositionActor(presents, device)
+        self.position_selection = PresentPositionActor(
+            presents, device, grid_features=grid_features, present_features=present_features)
 
         present_select_prob = TensorDictModule(
             self.present_selection,
             in_keys=["observation"],
-            out_keys=["orient_data"]
+            out_keys=["orient_data", "critic_data"]
         )
 
         present_select = ProbabilisticTensorDictModule(

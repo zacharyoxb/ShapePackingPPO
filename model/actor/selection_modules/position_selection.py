@@ -10,7 +10,7 @@ import torch
 class PresentPositionActor(nn.Module):
     """ Policy nn for PresentEnv to choose where to place present. """
 
-    def __init__(self, presents, device, grid_features=256, present_features=64):
+    def __init__(self, presents, device, grid_features, present_features):
         super().__init__()
 
         # Presents shouldn't be learnable/modifiable nor in state_dict
@@ -45,10 +45,10 @@ class PresentPositionActor(nn.Module):
 
     def forward(self, tensordict):
         """ Choose a placement position for the selected present in present_orient """
-        present_idx = tensordict.get(("orient_data", "present_idx"))
-        orient_idx = tensordict.get(("orient_data", "orient_idx"))
-        orients = tensordict.get(("orient_data", "orients"))
-        orient_mask = tensordict.get(("orient_mask", "chosen_orient"))
+        present_idx = tensordict.get("present_idx")
+        orient_idx = tensordict.get("orient_idx")
+        orients = tensordict.get("orients")
+        orient_mask = tensordict.get("chosen_orient")
 
         orient = orients[orient_mask]
         orient_features = orient.get("orient_features")

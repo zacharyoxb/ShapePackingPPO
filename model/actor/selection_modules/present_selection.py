@@ -56,12 +56,20 @@ class PresentSelectionActor(nn.Module):
         orient_logits = torch.tensor([])
         orient_data = []
 
+        # store features of available presents / modulated grids seperate for critic use
+        critic_present_features = []
+        critic_modulated_grids = []
+
         # Calculate scores for each orientation
         for present_idx, present_features in enumerate(self.all_present_features):
-            if present_count[present_idx] == 0:
-                continue
-
             for orient_idx, orient_features in enumerate(present_features):
+                if present_count[present_idx] == 0:
+                    # pad with zeros
+                    critic_present_features.append(torch.zeros_like(
+                        self.all_present_features[present_idx][orient_idx]))
+                    critic_modulated_grids.append(
+                        torch.zeros_like(grid_features))
+                    continue
                 score, modulated_grid = self.film(
                     grid_features, orient_features)
 
@@ -76,10 +84,19 @@ class PresentSelectionActor(nn.Module):
                         )
                     )
                 )
+                critic_present_features.append(
+                    self.all_present_features[present_idx][orient_idx])
+                critic_modulated_grids.append(modulated_grid)
 
         return TensorDict({
             "orient_data": {
                 "chosen_orient": orient_logits,
                 "orients": TensorDict.from_list(orient_data)
+            },
+
+            # store data used by critic so we don't have to rerun nn
+            "critic_data": {
+                "present_features": torch.stack(critic_present_features),
+                "modulated_grids": torch.stack(critic_modulated_grids)
             }
         })

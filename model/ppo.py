@@ -9,7 +9,6 @@ from torchrl.collectors import SyncDataCollector
 from torchrl.objectives.value import GAE
 from torchrl.objectives import ClipPPOLoss
 from tensordict.nn import (
-    TensorDictModule,
     set_interaction_type,
     InteractionType
 )
@@ -39,12 +38,9 @@ class PPO:
         self.policy_module = PresentActorSeq(
             self.presents, self.training_device)
 
-        self.value_net = PresentCritic(self.training_device)
-        self.value_module = TensorDictModule(
-            module=self.value_net,
-            in_keys=["observation"],
-            out_keys=["state_value"]
-        )
+        n_orients = sum(p.shape[0] for p in self.presents)
+
+        self.value_module = PresentCritic(n_orients, self.training_device)
 
         # Loss function config
         self.advantage_module = GAE(
@@ -83,10 +79,13 @@ class PPO:
         best = manager.load_best()
 
         if best:
-            self.value_net.load_state_dict(best.critic_state)
             self.policy_module.load_state_dict(best.policy_state)
             self.value_module.load_state_dict(best.value_state)
             self.loss_module.load_state_dict(best.loss_state)
+            self.policy_module.eval()
+            self.value_module.eval()
+            self.loss_module.eval()
+
             self.optim.load_state_dict(best.optim_state)
             self.scheduler.load_state_dict(best.scheduler_state)
 
@@ -206,7 +205,6 @@ class PPO:
 
         data = ModelData(
             logs['reward'][-1],
-            self.value_net.state_dict(),
             self.policy_module.state_dict(),
             self.value_module.state_dict(),
             self.loss_module.state_dict(),

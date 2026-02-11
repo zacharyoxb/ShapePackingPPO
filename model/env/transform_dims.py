@@ -80,12 +80,12 @@ class PresentEnvTransform(Transform):
             workers, batches, -1
         )
 
-        tensordict["action"] = {
+        tensordict.set("action", {
             "present_idx": present_idx,
             "present": present,
             "x": x,
             "y": y
-        }
+        })
 
         return tensordict
 
