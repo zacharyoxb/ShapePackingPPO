@@ -58,9 +58,6 @@ class PresentActorSeq(ProbabilisticTensorDictSequential):
             return_log_prob=True
         )
 
-        # change to buffer
-        self.presents = presents
-
         super().__init__(
             [
                 present_select_prob,

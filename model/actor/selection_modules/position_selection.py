@@ -12,7 +12,9 @@ class PresentPositionActor(nn.Module):
 
     def __init__(self, presents, device, grid_features=256, present_features=64):
         super().__init__()
-        self.presents = presents
+
+        # Presents shouldn't be learnable/modifiable nor in state_dict
+        self.register_buffer("presents", presents, persistent=False)
         self.device = device
         self.input_features = grid_features + present_features
 
@@ -61,7 +63,8 @@ class PresentPositionActor(nn.Module):
         y_std = self.y_std(combined_features)
 
         # get present for partial action output
-        present = self.presents[:, present_idx, orient_idx, :, :]
+        present = self.presents[:, present_idx,  # type: ignore
+                                orient_idx, :, :]
 
         return TensorDict({
             "action": {

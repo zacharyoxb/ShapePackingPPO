@@ -43,7 +43,7 @@ class PresentSelectionActor(nn.Module):
             present_features = torch.stack(orient_features)
             all_features.append(present_features)
 
-        self._all_present_features = torch.stack(all_features)
+        self.all_present_features = torch.stack(all_features)
 
     def forward(self, tensordict):
         """ Gets scores for orientation / modulated grids for them """
@@ -57,7 +57,7 @@ class PresentSelectionActor(nn.Module):
         orient_data = []
 
         # Calculate scores for each orientation
-        for present_idx, present_features in enumerate(self._all_present_features):
+        for present_idx, present_features in enumerate(self.all_present_features):
             if present_count[present_idx] == 0:
                 continue
 
@@ -71,7 +71,7 @@ class PresentSelectionActor(nn.Module):
                         OrientationEntry(
                             torch.tensor(present_idx),
                             torch.tensor(orient_idx),
-                            self._all_present_features[present_idx][orient_idx],
+                            self.all_present_features[present_idx][orient_idx],
                             modulated_grid
                         )
                     )
