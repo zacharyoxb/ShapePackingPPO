@@ -15,7 +15,7 @@ from model.actor.selection_modules.present_selection import PresentSelectionActo
 
 
 class PresentActorSeq(ProbabilisticTensorDictSequential):
-    """ Policy nn for PresentEnv with spatial awareness """
+    """ Sequence tensordict for PresentEnv with spatial awareness """
 
     def __init__(
         self,

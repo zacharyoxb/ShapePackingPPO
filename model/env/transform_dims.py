@@ -26,27 +26,8 @@ class PresentEnvTransform(Transform):
         grid = next_tensordict.get(("observation", "grid"))
         present_count = next_tensordict.get(("observation", "present_count"))
 
-        self.workers = None
-        self.batches = None
-
-        # If inputs are unbatched
-        if grid.dim() == 2:
-            # Add batch/channel
-            grid = grid.unsqueeze(0).unsqueeze(0)
-            present_count = present_count.unsqueeze(0)
-        # If inputs are single batched
-        elif grid.dim() == 3:
-            # Add channel
-            grid = grid.unsqueeze(1)
-        # If inputs are double batched
-        elif grid.dim() == 4:
-            # Add channel
-            grid = grid.unsqueeze(2)
-            # combine workers and batches
-            self.workers, self.batches = grid.shape[0], grid.shape[1]
-            grid = grid.view(self.workers * self.batches, *grid.shape[2:])
-            present_count = present_count.view(
-                self.workers * self.batches, *present_count.shape[2:])
+        # Add channel
+        grid = grid.unsqueeze(0)
 
         next_tensordict.set("observation", {
             "grid": grid,
@@ -58,6 +39,8 @@ class PresentEnvTransform(Transform):
     def _reset(
         self, tensordict: TensorDictBase, tensordict_reset: TensorDictBase
     ) -> TensorDictBase:
+        self.workers = None
+        self.batches = None
         return self._call(tensordict_reset)
 
     def forward(self, tensordict: TensorDict) -> TensorDict:

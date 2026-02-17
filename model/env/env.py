@@ -55,8 +55,8 @@ class PresentEnv(EnvBase):
         # Observation spec: what the agent sees
         self.observation_spec = Composite({
             "observation": {
-                "grid": Bounded(low=0, high=1, dtype=torch.float32, shape=torch.Size((-1, -1, h, w)),
-                                device=self.device),
+                "grid": Bounded(low=0, high=1, dtype=torch.float32,
+                                shape=torch.Size((-1, -1, h, w)), device=self.device),
                 "present_count": Unbounded(shape=torch.Size([-1, 6]), dtype=torch.float32,
                                            device=self.device),
             }

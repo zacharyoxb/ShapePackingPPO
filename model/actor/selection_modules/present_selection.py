@@ -1,12 +1,12 @@
-""" 
-First Actor module. Outputs scores for each present orientation
-and the modulated grid of each orientation. 
 """
+First Actor module. Outputs scores for each present orientation
+and the modulated grid of each orientation.
+"""
+from itertools import chain
 from tensordict import TensorDict
 from torch import nn
 import torch
 
-from model.actor.selection_modules.td_utils import OrientationEntry
 from model.actor.feature_modules.film import FiLM
 from model.actor.feature_modules.grid_features import GridExtractor
 from model.actor.feature_modules.present_features import PresentExtractor
@@ -17,6 +17,8 @@ class PresentSelectionActor(nn.Module):
 
     def __init__(self, presents: torch.Tensor, device: torch.device):
         super().__init__()
+
+        self.device = device
 
         # Presents shouldn't be learnable/modifiable nor in state_dict
         self.register_buffer("all_present_features",
@@ -45,58 +47,64 @@ class PresentSelectionActor(nn.Module):
 
         self.all_present_features = torch.stack(all_features)
 
+    def _process_present_orients(self, grid_features, present_feat, p_idx):
+        scores = []
+        orient_tds = []
+        present_feats = []
+        modulated_grids = []
+
+        for o_idx, orient_feat in enumerate(present_feat):
+            score, modulated_grid = self.film(grid_features, orient_feat)
+
+            # add batch dim
+            present_idx = torch.tensor(p_idx, dtype=torch.uint8).unsqueeze(0)
+            orient_idx = torch.tensor(o_idx, dtype=torch.uint8).unsqueeze(0)
+
+            orient_td = TensorDict({
+                "present_idx": present_idx,
+                "orient_idx": orient_idx,
+                "orient_features": orient_feat,
+                "modulated_grid": modulated_grid
+            })
+
+            scores.append(score)
+            orient_tds.append(orient_td)
+
+            present_feats.append(orient_feat)
+            modulated_grids.append(modulated_grid)
+
+        return scores, orient_tds, present_feats, modulated_grids
+
     def forward(self, tensordict):
         """ Gets scores for orientation / modulated grids for them """
         grid = tensordict.get("grid")
         present_count = tensordict.get("present_count")
 
-        # Extract features
         grid_features = self.grid_extractor(grid)
 
-        orient_logits = torch.tensor([])
-        orient_data = []
+        # orient predictions
+        present_tuples = []
 
-        # store features of available presents / modulated grids seperate for critic use
-        critic_present_features = []
-        critic_modulated_grids = []
+        for p_idx, present_feat in enumerate(self.all_present_features):
+            if present_count[:, p_idx] == 0:
+                continue
+            present_tuple = self._process_present_orients(
+                grid_features, present_feat, p_idx)
+            present_tuples.append(present_tuple)
 
-        # Calculate scores for each orientation
-        for present_idx, present_features in enumerate(self.all_present_features):
-            for orient_idx, orient_features in enumerate(present_features):
-                if present_count[present_idx] == 0:
-                    # pad with zeros
-                    critic_present_features.append(torch.zeros_like(
-                        self.all_present_features[present_idx][orient_idx]))
-                    critic_modulated_grids.append(
-                        torch.zeros_like(grid_features))
-                    continue
-                score, modulated_grid = self.film(
-                    grid_features, orient_features)
-
-                orient_logits.add(score)
-                orient_data.append(
-                    TensorDict.from_dataclass(
-                        OrientationEntry(
-                            torch.tensor(present_idx),
-                            torch.tensor(orient_idx),
-                            self.all_present_features[present_idx][orient_idx],
-                            modulated_grid
-                        )
-                    )
-                )
-                critic_present_features.append(
-                    self.all_present_features[present_idx][orient_idx])
-                critic_modulated_grids.append(modulated_grid)
+        # transpose tuples
+        orient_logits, orient_tds, present_feats, modulated_grids = zip(
+            *present_tuples)
 
         return TensorDict({
             "orient_data": {
-                "chosen_orient": orient_logits,
-                "orients": TensorDict.from_list(orient_data)
+                "chosen_orient": torch.stack(list(
+                    chain.from_iterable(orient_logits)
+                ), dim=1).squeeze(-1),
+                "orients": torch.stack(list(chain.from_iterable(orient_tds)), dim=1)
             },
-
-            # store data used by critic so we don't have to rerun nn
             "critic_data": {
-                "present_features": torch.stack(critic_present_features),
-                "modulated_grids": torch.stack(critic_modulated_grids)
+                "present_features": torch.stack(list(chain.from_iterable(present_feats)), dim=1),
+                "modulated_grids": torch.stack(list(chain.from_iterable(modulated_grids)), dim=1)
             }
         })
