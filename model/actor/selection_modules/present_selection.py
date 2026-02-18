@@ -56,16 +56,17 @@ class PresentSelectionActor(nn.Module):
         for o_idx, orient_feat in enumerate(present_feat):
             score, modulated_grid = self.film(grid_features, orient_feat)
 
-            # add batch dim
-            present_idx = torch.tensor(p_idx, dtype=torch.uint8).unsqueeze(0)
-            orient_idx = torch.tensor(o_idx, dtype=torch.uint8).unsqueeze(0)
+            present_idx = torch.tensor(
+                p_idx, dtype=torch.uint8, device=self.device).unsqueeze(0)
+            orient_idx = torch.tensor(
+                o_idx, dtype=torch.uint8).unsqueeze(0)
 
             orient_td = TensorDict({
                 "present_idx": present_idx,
                 "orient_idx": orient_idx,
                 "orient_features": orient_feat,
                 "modulated_grid": modulated_grid
-            })
+            }, batch_size=orient_feat.shape[0])
 
             scores.append(score)
             orient_tds.append(orient_td)
@@ -98,13 +99,31 @@ class PresentSelectionActor(nn.Module):
 
         return TensorDict({
             "orient_data": {
-                "chosen_orient": torch.stack(list(
-                    chain.from_iterable(orient_logits)
-                ), dim=1).squeeze(-1),
-                "orients": torch.stack(list(chain.from_iterable(orient_tds)), dim=1)
+                "logits": torch.stack(
+                    list(
+                        chain.from_iterable(orient_logits)
+                    ),
+                    dim=1
+                ).squeeze(-1),
+                "orients": torch.stack(
+                    list(
+                        chain.from_iterable(orient_tds)
+                    ),
+                    dim=1
+                )
             },
             "critic_data": {
-                "present_features": torch.stack(list(chain.from_iterable(present_feats)), dim=1),
-                "modulated_grids": torch.stack(list(chain.from_iterable(modulated_grids)), dim=1)
+                "present_features": torch.stack(
+                    list(
+                        chain.from_iterable(present_feats)
+                    ),
+                    dim=1
+                ),
+                "modulated_grids": torch.stack(
+                    list(
+                        chain.from_iterable(modulated_grids)
+                    ),
+                    dim=1
+                )
             }
         })

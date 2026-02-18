@@ -28,7 +28,7 @@ class PresentActorSeq(ProbabilisticTensorDictSequential):
 
         present_selection = PresentSelectionActor(presents, device)
         position_selection = PresentPositionActor(
-            presents, device, grid_features=grid_features, present_features=present_features)
+            presents, device, grid_features, present_features)
 
         present_select_prob = TensorDictModule(
             present_selection,
@@ -37,7 +37,7 @@ class PresentActorSeq(ProbabilisticTensorDictSequential):
         )
 
         present_select = ProbabilisticTensorDictModule(
-            in_keys=["orient_data"],
+            in_keys=[("orient_data", "logits")],
             out_keys=["orient_mask"],
             distribution_class=OneHotCategorical,
             return_log_prob=True
