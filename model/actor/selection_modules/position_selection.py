@@ -43,19 +43,21 @@ class PresentPositionActor(nn.Module):
             nn.Softplus()
         ).to(self.device)
 
-    def forward(self, tensordict):
-        """ Choose a placement position for the selected present in present_orient """
-        present_idx = tensordict.get("present_idx")
-        orient_idx = tensordict.get("orient_idx")
-        orients = tensordict.get("orients")
-        orient_mask = tensordict.get("chosen_orient")
+    def forward(self, choice_tensor, orient_td):
+        """ Choose a placement position for the selected present in orients """
+        orient_idx = torch.argmax(choice_tensor, dim=1)
+        orient = orient_td.get("orients")[:, orient_idx.item()]
 
-        orient = orients[orient_mask]
+        present_idx = orient.get("present_idx")
+        orient_idx = orient.get("orient_idx")
         orient_features = orient.get("orient_features")
         modulated_grid = orient.get("modulated_grid")
 
         # Concat present and modulated grid together
-        combined_features = torch.cat([orient_features, modulated_grid], dim=1)
+        combined_features = torch.cat([
+            torch.flatten(orient_features, start_dim=1),
+            torch.flatten(modulated_grid, start_dim=1)
+        ], dim=1)
 
         x_mean = self.x_mean(combined_features)
         x_std = self.x_std(combined_features)
@@ -63,8 +65,9 @@ class PresentPositionActor(nn.Module):
         y_std = self.y_std(combined_features)
 
         # get present for partial action output
-        present = self.presents[:, present_idx,  # type: ignore
-                                orient_idx, :, :]
+        present = self.presents[  # type: ignore
+            present_idx.item(), orient_idx.item(), :, :
+        ].unsqueeze(0)
 
         return TensorDict({
             "action": {

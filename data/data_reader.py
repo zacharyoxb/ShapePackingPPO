@@ -79,8 +79,6 @@ def _unique_orientations(present) -> torch.Tensor:
         flat = rotated.flatten()
         if flat not in seen:
             seen.add(flat)
-            # batch, conv dim
-            rotated = rotated.unsqueeze(0).unsqueeze(0)
             orientations.append(rotated)
 
     # Flip along vertical axis, horizontal and both
@@ -93,8 +91,6 @@ def _unique_orientations(present) -> torch.Tensor:
             flat = rotated_flipped.flatten()
             if flat not in seen:
                 seen.add(flat)
-                # batch, conv dim
-                rotated_flipped = rotated_flipped.unsqueeze(0).unsqueeze(0)
                 orientations.append(rotated_flipped)
 
     return torch.stack(orientations)

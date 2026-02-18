@@ -36,9 +36,8 @@ class PresentSelectionActor(nn.Module):
         for present in presents:
             orient_features = []
             for orient in present:
-                # add channel dim
-                present = present.unsqueeze(0)
-
+                # add batch, channel dim
+                orient = orient.unsqueeze(0).unsqueeze(0)
                 features = self.present_extractor(orient)
                 orient_features.append(features)
 

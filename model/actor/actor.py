@@ -45,7 +45,7 @@ class PresentActorSeq(ProbabilisticTensorDictSequential):
 
         present_pos_prob = TensorDictModule(
             position_selection,
-            in_keys=["orient_data", "orient_mask"],
+            in_keys=["orient_mask", "orient_data"],
             out_keys=["action", "pos_probs"],
         )
 
