@@ -74,7 +74,7 @@ class PresentPositionActor(nn.Module):
                 "present_idx": present_idx,
                 "present": present
             },
-            "pos_probs": {
+            "params": {
                 "x": {
                     "loc": x_mean,
                     "scale": x_std

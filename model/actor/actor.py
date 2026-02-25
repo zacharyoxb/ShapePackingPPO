@@ -46,11 +46,11 @@ class PresentActorSeq(ProbabilisticTensorDictSequential):
         present_pos_prob = TensorDictModule(
             position_selection,
             in_keys=["orient_mask", "orient_data"],
-            out_keys=["action", "pos_probs"],
+            out_keys=["action", "params"],
         )
 
         present_pos = ProbabilisticTensorDictModule(
-            in_keys=["pos_probs"],
+            in_keys=["params"],
             distribution_class=CompositeDistribution,
             distribution_kwargs={
                 "distribution_map": {
@@ -71,6 +71,8 @@ class PresentActorSeq(ProbabilisticTensorDictSequential):
                 present_select,
                 present_pos_prob,
                 present_pos
-            ]
+            ],
+            return_composite=True
+
         )
         self.flatten = nn.Flatten()
