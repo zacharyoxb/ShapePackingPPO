@@ -33,7 +33,7 @@ class PresentActorSeq(ProbabilisticTensorDictSequential):
         present_select_prob = TensorDictModule(
             present_selection,
             in_keys=["observation"],
-            out_keys=["orient_data", "critic_data"]
+            out_keys=["orient_data"]
         )
 
         present_select = ProbabilisticTensorDictModule(

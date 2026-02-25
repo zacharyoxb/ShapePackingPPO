@@ -49,8 +49,6 @@ class PresentSelectionActor(nn.Module):
     def _process_present_orients(self, grid_features, present_feat, p_idx):
         scores = []
         orient_tds = []
-        present_feats = []
-        modulated_grids = []
 
         for o_idx, orient_feat in enumerate(present_feat):
             score, modulated_grid = self.film(grid_features, orient_feat)
@@ -70,10 +68,7 @@ class PresentSelectionActor(nn.Module):
             scores.append(score)
             orient_tds.append(orient_td)
 
-            present_feats.append(orient_feat)
-            modulated_grids.append(modulated_grid)
-
-        return scores, orient_tds, present_feats, modulated_grids
+        return scores, orient_tds
 
     def forward(self, tensordict):
         """ Gets scores for orientation / modulated grids for them """
@@ -93,7 +88,7 @@ class PresentSelectionActor(nn.Module):
             present_tuples.append(present_tuple)
 
         # transpose tuples
-        orient_logits, orient_tds, present_feats, modulated_grids = zip(
+        orient_logits, orient_tds = zip(
             *present_tuples)
 
         return TensorDict({
@@ -111,18 +106,4 @@ class PresentSelectionActor(nn.Module):
                     dim=1
                 )
             },
-            "critic_data": {
-                "present_features": torch.stack(
-                    list(
-                        chain.from_iterable(present_feats)
-                    ),
-                    dim=1
-                ),
-                "modulated_grids": torch.stack(
-                    list(
-                        chain.from_iterable(modulated_grids)
-                    ),
-                    dim=1
-                )
-            }
         })
