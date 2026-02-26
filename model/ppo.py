@@ -38,9 +38,7 @@ class PPO:
         self.policy_module = PresentActorSeq(
             self.presents, self.training_device)
 
-        n_orients = sum(p.shape[0] for p in self.presents)
-
-        self.value_module = PresentCritic(n_orients, self.training_device)
+        self.value_module = PresentCritic(self.training_device)
 
         # Loss function config
         self.advantage_module = GAE(

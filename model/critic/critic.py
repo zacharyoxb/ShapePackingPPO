@@ -10,15 +10,11 @@ class PresentCritic(TensorDictModule):
 
     def __init__(
             self,
-            modulated_grid_dim,
             device,
-            *,
-            present_feat_dim=64*6,
     ):
-
         value_head = PresentValue(
-            modulated_grid_dim, present_feat_dim, device)
+            device)
 
         super().__init__(value_head, in_keys=[
-            "critic_data"], out_keys=["state_value"])
+            "observation"], out_keys=["state_value"])
         self.flatten = nn.Flatten()
