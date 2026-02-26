@@ -1,4 +1,4 @@
-""" Main file"""
+""" Main file """
 
 import warnings
 

@@ -53,17 +53,25 @@ class PresentSelectionActor(nn.Module):
         for o_idx, orient_feat in enumerate(present_feat):
             score, modulated_grid = self.film(grid_features, orient_feat)
 
+            batch_dim = score.shape[0]
+
+            # Getting idx tensors of correct batch size
             present_idx = torch.tensor(
-                p_idx, dtype=torch.uint8, device=self.device).unsqueeze(0)
+                p_idx, dtype=torch.uint8, device=self.device).unsqueeze(0).repeat(batch_dim)
             orient_idx = torch.tensor(
-                o_idx, dtype=torch.uint8).unsqueeze(0)
+                o_idx, dtype=torch.uint8).unsqueeze(0).repeat(batch_dim)
+
+            if batch_dim > 1:
+                batched_orients = orient_feat.repeat(batch_dim, 1, 1)
+            else:
+                batched_orients = orient_feat
 
             orient_td = TensorDict({
                 "present_idx": present_idx,
                 "orient_idx": orient_idx,
-                "orient_features": orient_feat,
+                "orient_features": batched_orients,
                 "modulated_grid": modulated_grid
-            }, batch_size=orient_feat.shape[0])
+            }, batch_size=batch_dim)
 
             scores.append(score)
             orient_tds.append(orient_td)
@@ -74,36 +82,41 @@ class PresentSelectionActor(nn.Module):
         """ Gets scores for orientation / modulated grids for them """
         grid = tensordict.get("grid")
         present_count = tensordict.get("present_count")
-
+        # Get features
         grid_features = self.grid_extractor(grid)
 
         # orient predictions
         present_tuples = []
 
         for p_idx, present_feat in enumerate(self.all_present_features):
-            if present_count[:, p_idx] == 0:
-                continue
+            if present_count.dim() > 2:
+                mask = present_count[:, :, p_idx] != 0
+            else:
+                mask = present_count[:, p_idx] != 0
             present_tuple = self._process_present_orients(
-                grid_features, present_feat, p_idx)
+                grid_features[mask], present_feat, p_idx)
             present_tuples.append(present_tuple)
 
         # transpose tuples
         orient_logits, orient_tds = zip(
             *present_tuples)
 
+        logits = torch.stack(
+            list(
+                chain.from_iterable(orient_logits)
+            ),
+            dim=1
+        ).squeeze(-1)
+        orients = torch.stack(
+            list(
+                chain.from_iterable(orient_tds)
+            ),
+            dim=1
+        )
+
         return TensorDict({
             "orient_data": {
-                "logits": torch.stack(
-                    list(
-                        chain.from_iterable(orient_logits)
-                    ),
-                    dim=1
-                ).squeeze(-1),
-                "orients": torch.stack(
-                    list(
-                        chain.from_iterable(orient_tds)
-                    ),
-                    dim=1
-                )
+                "logits": logits,
+                "orients": orients
             },
         })
