@@ -45,19 +45,28 @@ class PresentPositionActor(nn.Module):
 
     def forward(self, choice_tensor, orient_td):
         """ Choose a placement position for the selected present in orients """
-        orient_idx = torch.argmax(choice_tensor, dim=1)
-        orient = orient_td.get("orients")[:, orient_idx.item()]
+        # worker dim (if exists) and batch dim
+        batch_dims = choice_tensor.shape[:-1]
+        orient_idxs = torch.argmax(choice_tensor, dim=len(batch_dims))
+
+        orients = orient_td.get("orients")
+
+        # if batch dim is more than 1
+        if batch_dims[-1] > 1:
+            orient = orients.gather(len(batch_dims), orient_idxs)
+        else:
+            orient = orients[:, orient_idxs]
 
         present_idx = orient.get("present_idx")
         orient_idx = orient.get("orient_idx")
-        orient_features = orient.get("orient_features")
-        modulated_grid = orient.get("modulated_grid")
 
         # Concat present and modulated grid together
         combined_features = torch.cat([
-            torch.flatten(orient_features, start_dim=1),
-            torch.flatten(modulated_grid, start_dim=1)
-        ], dim=1)
+            torch.flatten(orient.get("orient_features"),
+                          start_dim=len(batch_dims)),
+            torch.flatten(orient.get("modulated_grid"),
+                          start_dim=len(batch_dims))
+        ], dim=len(batch_dims))
 
         x_mean = self.x_mean(combined_features)
         x_std = self.x_std(combined_features)
