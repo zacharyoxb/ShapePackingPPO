@@ -50,28 +50,36 @@ class PresentSelectionActor(nn.Module):
         scores = []
         orient_tds = []
 
+        # get worker dim (if exists) and batch dim
+        batch_dims = grid_features.shape[:-1]
+
         for o_idx, orient_feat in enumerate(present_feat):
             score, modulated_grid = self.film(grid_features, orient_feat)
 
-            batch_dim = score.shape[0]
-
             # Getting idx tensors of correct batch size
             present_idx = torch.tensor(
-                p_idx, dtype=torch.uint8, device=self.device).unsqueeze(0).repeat(batch_dim)
+                p_idx, dtype=torch.uint8, device=self.device).unsqueeze(0).repeat(batch_dims[-1])
             orient_idx = torch.tensor(
-                o_idx, dtype=torch.uint8).unsqueeze(0).repeat(batch_dim)
+                o_idx, dtype=torch.uint8).unsqueeze(0).repeat(batch_dims[-1])
 
-            if batch_dim > 1:
-                batched_orients = orient_feat.repeat(batch_dim, 1, 1)
+            # if batch dim is not 1
+            if batch_dims[-1] > 1:
+                batched_orients = orient_feat.repeat(batch_dims[-1], 1, 1)
             else:
                 batched_orients = orient_feat
+
+            # if there is a worker dim, add another dim to idxs/orients
+            if len(batch_dims) > 1:
+                present_idx = present_idx.unsqueeze(0)
+                orient_idx = orient_idx.unsqueeze(0)
+                batched_orients = batched_orients.unsqueeze(0)
 
             orient_td = TensorDict({
                 "present_idx": present_idx,
                 "orient_idx": orient_idx,
                 "orient_features": batched_orients,
                 "modulated_grid": modulated_grid
-            }, batch_size=batch_dim)
+            }, batch_size=batch_dims)
 
             scores.append(score)
             orient_tds.append(orient_td)
@@ -82,6 +90,7 @@ class PresentSelectionActor(nn.Module):
         """ Gets scores for orientation / modulated grids for them """
         grid = tensordict.get("grid")
         present_count = tensordict.get("present_count")
+
         # Get features
         grid_features = self.grid_extractor(grid)
 
@@ -90,11 +99,18 @@ class PresentSelectionActor(nn.Module):
 
         for p_idx, present_feat in enumerate(self.all_present_features):
             if present_count.dim() > 2:
-                mask = present_count[:, :, p_idx] != 0
+                mask = (present_count[:, :, p_idx] != 0).unsqueeze(-1)
             else:
                 mask = present_count[:, p_idx] != 0
+
+            if not mask.any():
+                continue
+
+            masked_grids = torch.where(
+                mask, grid_features, torch.tensor(0.0, device=self.device))
+
             present_tuple = self._process_present_orients(
-                grid_features[mask], present_feat, p_idx)
+                masked_grids, present_feat, p_idx)
             present_tuples.append(present_tuple)
 
         # transpose tuples
@@ -105,13 +121,15 @@ class PresentSelectionActor(nn.Module):
             list(
                 chain.from_iterable(orient_logits)
             ),
-            dim=1
+            # 1 if no worker, 2 if worker
+            dim=present_count.dim() - 1
         ).squeeze(-1)
         orients = torch.stack(
             list(
                 chain.from_iterable(orient_tds)
             ),
-            dim=1
+            # 1 if no worker, 2 if worker
+            dim=present_count.dim() - 1
         )
 
         return TensorDict({
