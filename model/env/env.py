@@ -139,7 +139,7 @@ class PresentEnv(EnvBase):
         done = torch.tensor(False)
         if torch.sum(batch_state.present_count) == 0:
             done = torch.tensor(True)
-            reward += 200
+            reward = reward + 200
 
         return batch_state.grid, batch_state.present_count, reward, done
 

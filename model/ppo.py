@@ -87,32 +87,28 @@ class PPO:
             self.optim.load_state_dict(best.optim_state)
             self.scheduler.load_state_dict(best.scheduler_state)
 
-    def _process_sub_batch(self, replay_buffer):
-        # Calculate loss on subdata sample
-        subdata = replay_buffer.sample(
-            self.config.sub_batch_size)
+    def _process_sample(self, sample):
+        # Run forward pass of loss module
+        loss_vals = self.loss_module(sample)
 
-        # detach so backwards() doesn't fail
-        subdata = subdata.detach()
-
-        loss_vals = self.loss_module(subdata.to(self.training_device))
-
-        loss_value = (
+        loss = (
             loss_vals["loss_objective"]
             + loss_vals["loss_critic"]
             + loss_vals["loss_entropy"]
         )
 
         # Optimise
-        loss_value.backward()
+        loss.backward()
 
-        # Clear loss tensors immediately after backward
-        del loss_value, loss_vals
-
+        # Clip to prevent exploding gradients
         torch.nn.utils.clip_grad_norm_(
             self.loss_module.parameters(), self.config.max_grad_norm
         )
+
+        # Run the optimiser
         self.optim.step()
+
+        # Clear accumulated gradients
         self.optim.zero_grad()
 
     def train(self):
@@ -156,7 +152,10 @@ class PPO:
                     self.advantage_module(dev_batch)
                     replay_buffer.extend(batch)
                     for _ in range(self.config.frames_per_batch // self.config.sub_batch_size):
-                        self._process_sub_batch(replay_buffer)
+                        sample = replay_buffer.sample(
+                            self.config.sub_batch_size)
+                        sample = sample.to(self.training_device)
+                        self._process_sample(sample)
 
                 # Processed all epochs, log data
                 logs["reward"].append(
