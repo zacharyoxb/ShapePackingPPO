@@ -92,6 +92,9 @@ class PPO:
         subdata = replay_buffer.sample(
             self.config.sub_batch_size)
 
+        # detach so backwards() doesn't fail
+        subdata = subdata.detach()
+
         loss_vals = self.loss_module(subdata.to(self.training_device))
 
         loss_value = (

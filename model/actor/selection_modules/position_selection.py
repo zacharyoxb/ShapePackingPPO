@@ -74,9 +74,14 @@ class PresentPositionActor(nn.Module):
         y_std = self.y_std(combined_features)
 
         # get present for partial action output
-        present = self.presents[  # type: ignore
-            present_idx.item(), orient_idx.item(), :, :
-        ].unsqueeze(0)
+        if present_idx.numel() < 2:
+            present = self.presents[  # type: ignore
+                present_idx.item(), orient_idx.item(), :, :
+            ].unsqueeze(0)
+        else:
+            present = self.presents[  # type: ignore
+                present_idx.tolist(), orient_idx.tolist(), :, :
+            ]
 
         return TensorDict({
             "action": {
