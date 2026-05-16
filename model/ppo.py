@@ -125,13 +125,13 @@ class PPO:
                 total_frames=self.config.total_frames,
                 create_env_kwargs={
                     "start_state": td,
-                    "num_workers": 1,
+                    "num_workers": self.config.num_workers,
                     "device": torch.device("cpu")
                 },
                 # prevents linux CUDA permission err
                 device=torch.device("cpu"),
                 storing_device=torch.device("cpu"),
-                policy_device=self.training_device
+                policy_device=self.training_device,
             )
 
             # Note: memmap is cpu - only

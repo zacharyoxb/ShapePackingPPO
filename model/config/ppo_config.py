@@ -6,6 +6,12 @@ import torch
 
 
 @dataclass
+class ProcessingParameters:
+    """ Parameters referring to processing power used. """
+    num_workers = 1
+
+
+@dataclass
 class Hyperparameters:
     """ Hyperparameters """
     is_fork = multiprocessing.get_start_method() == "fork"
@@ -43,9 +49,16 @@ class PPOParameters:
 class PPOConfig:
     """Complete PPO Hyperparameters Configuration"""
 
+    processing_parameters: ProcessingParameters = field(
+        default=ProcessingParameters())
     hyper_parameters: Hyperparameters = field(default=Hyperparameters())
     data_collection: DataCollection = field(default=DataCollection())
     ppo_parameters: PPOParameters = field(default=PPOParameters())
+
+    @property
+    def num_workers(self):
+        """ How many workers to use in the env """
+        return self.processing_parameters.num_workers
 
     @property
     def is_fork(self):
