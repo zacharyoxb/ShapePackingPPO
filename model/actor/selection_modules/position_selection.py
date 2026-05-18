@@ -62,14 +62,19 @@ class PresentPositionActor(nn.Module):
 
         present_idx = orient.get("present_idx")
         orient_idx = orient.get("orient_idx")
+        orient_features = orient.get("orient_features")
+        modulated_grid = orient.get("modulated_grid")
 
-        # Concat present and modulated grid together
-        combined_features = torch.cat([
-            torch.flatten(orient.get("orient_features"),
-                          start_dim=len(batch_dims)),
-            torch.flatten(orient.get("modulated_grid"),
-                          start_dim=len(batch_dims))
-        ], dim=len(batch_dims))
+        if len(batch_dims) > 0:
+            combined_features = torch.cat([
+                orient_features.view(*batch_dims, -1),
+                modulated_grid.view(*batch_dims, -1)
+            ], dim=-1)
+        else:
+            combined_features = torch.cat([
+                orient_features,
+                modulated_grid
+            ], dim=-1)
 
         x_mean = self.x_mean(combined_features)
         x_std = self.x_std(combined_features)
