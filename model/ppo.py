@@ -171,8 +171,8 @@ class PPO:
                 if i % 10 == 0:
                     with set_interaction_type(InteractionType.DETERMINISTIC), torch.no_grad():
                         # execute a rollout with the trained policy
-                        env = PresentEnv(td, self.presents,
-                                         device=self.training_device)
+                        env = PresentEnv.make_transformed_env(
+                            td, device=self.training_device)
                         eval_rollout = env.rollout(1000, self.policy_module)
                         logs["eval reward"].append(
                             eval_rollout["next", "reward"].mean().item())
