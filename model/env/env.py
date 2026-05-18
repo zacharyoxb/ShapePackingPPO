@@ -7,7 +7,7 @@ from torchrl.data import (Bounded, Composite, Unbounded,
 from torchrl.envs import EnvBase, ParallelEnv, TransformedEnv
 
 from model.datatypes import action, state
-from model.env.transform_dims import PresentEnvTransform
+from model.env.env_transform import PresentEnvTransform
 
 MAX_PRESENT_IDX = 5
 MAX_ROT = 3
@@ -217,11 +217,11 @@ class PresentEnv(EnvBase):
         Creates a TransformedEnv with a PresentEnv inside
         for easy batch and dimension handling.
         """
-        worker_start_state = start_state.clone()
-        worker_start_state = worker_start_state.to(device)
+        env_start_state = start_state.clone()
+        env_start_state = env_start_state.to(device)
 
         env = PresentEnv(
-            start_state=worker_start_state,
+            start_state=env_start_state,
             seed=seed,
             device=device
         )
