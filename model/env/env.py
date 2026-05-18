@@ -107,27 +107,53 @@ class PresentEnv(EnvBase):
             batch_state: state.State,
             batch_action: action.Action
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        w, h = batch_state.grid.shape
+        w, h = batch_state.grid.shape[-2], batch_state.grid.shape[-1]
 
-        # out of bounds check
-        in_bounds = (batch_action.x >= 0) & (batch_action.y >= 0) & (
-            batch_action.x + 2 < w) & (batch_action.y + 2 < h)
-        if not in_bounds:
-            reward = torch.tensor(-40, dtype=torch.float32)
-            done = torch.tensor(True)
-            return batch_state.grid, batch_state.present_count, reward, done
+        # If no batches, unsqueeze grid/present so batched/singleton is identical
+        if not self.batch_size:
+            batch_state.grid = batch_state.grid.unsqueeze(0)
+            batch_action.present = batch_action.present.unsqueeze(0)
 
-        present = batch_action.present
+        # Round coords
+        x_coords = torch.round(torch.tensor(batch_action.x))
+        y_coords = torch.round(torch.tensor(batch_action.y))
 
-        # round x y values
-        x, y = round(float(batch_action.x)), round(float(batch_action.y))
+        # In bounds mask
+        in_bounds = torch.where(
+            (x_coords >= 0) &
+            (y_coords >= 0) &
+            (x_coords + 2 < w) &
+            (y_coords + 2 < h),
+            True,
+            False
+        )
 
-        # collision check
-        grid_region = batch_state.grid[y:y+3, x:x+3]
-        if torch.any(present * grid_region > 0):
-            reward = torch.tensor(-20, dtype=torch.float32)
-            done = torch.tensor(True)
-            return batch_state.grid, batch_state.present_count, reward, done
+        # Init reward and done values
+        rewards = torch.full(
+            self.batch_size or torch.Size([1]), -40, dtype=torch.float32,
+            device=batch_state.grid.device
+        )
+        dones = torch.ones(self.batch_size or torch.Size([1]), dtype=torch.bool,
+                           device=batch_state.grid.device)
+
+        # If they are all out of bounds, return
+        if not in_bounds.any():
+            return batch_state.grid, batch_state.present_count, rewards, dones
+
+        # Initialise collisions
+        collisions = torch.zeros(
+            self.batch_size or torch.Size([1]), dtype=torch.bool, device=batch_state.grid.device)
+
+        # Check collisions for every in-bounds action
+        for i in torch.where(in_bounds):
+            x, y = int(x_coords[i]), int(y_coords[i])
+            grid_region = batch_state.grid[i, y:y+3, x:x+3]
+            present = batch_action.present[i, :, :]
+            collisions[i] = torch.any((present * grid_region) > 0)
+
+        # If there are any collisions, set reward to -20
+
+        # Otherwise place on grid
 
         batch_state.present_count[int(batch_action.present_idx)] -= 1
         batch_state.grid[y:y+3, x:x+3] = torch.maximum(grid_region, present)
