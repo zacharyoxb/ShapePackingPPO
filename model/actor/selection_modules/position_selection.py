@@ -51,8 +51,11 @@ class PresentPositionActor(nn.Module):
 
         orients = orient_td.get("orients")
 
+        # if there are no batch dims (singleton)
+        if len(batch_dims) == 0:
+            orient = orients
         # if batch dim is more than 1
-        if batch_dims[-1] > 1:
+        elif batch_dims[-1] > 1:
             orient = orients.gather(len(batch_dims), orient_idxs)
         else:
             orient = orients[:, orient_idxs]

@@ -49,10 +49,14 @@ class GridExtractor(nn.Module):
     def forward(self, grid):
         """ Module forward functions - gets grid features """
 
-        # if worker dim exists, combine with batch dim
+        # if worker and batch dim exist, combine them
         original_shape = grid.shape
         if grid.dim() > 4:
             grid = grid.view(-1, *original_shape[2:])
+
+        # if grid is 3d, add extra dim
+        if grid.dim() == 3:
+            grid = grid.unsqueeze(0)
 
         grid_features = self.encoder(grid)
 

@@ -109,8 +109,10 @@ class PresentSelectionActor(nn.Module):
         for p_idx, present_feat in enumerate(self.all_present_features):
             if present_count.dim() > 2:
                 mask = (present_count[:, :, p_idx] != 0).unsqueeze(-1)
-            else:
+            elif present_count.dim() > 1:
                 mask = present_count[:, p_idx] != 0
+            else:
+                mask = present_count[p_idx] != 0
 
             if not mask.any():
                 continue
