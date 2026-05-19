@@ -109,10 +109,12 @@ class PresentEnv(EnvBase):
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         w, h = batch_state.grid.shape[-2], batch_state.grid.shape[-1]
 
-        # If no batches, unsqueeze grid/present so batched/singleton is identical
+        # Always unsqueeze present if there's no batches
         if not self.batch_size:
-            batch_state.grid = batch_state.grid.unsqueeze(0)
             batch_action.present = batch_action.present.unsqueeze(0)
+        # We only need to unsqueeze grid state once
+        if batch_state.grid.dim() < 3:
+            batch_state.grid = batch_state.grid.unsqueeze(0)
 
         # Round coords
         x_coords = torch.round(torch.tensor(batch_action.x))
@@ -153,6 +155,10 @@ class PresentEnv(EnvBase):
 
         # If there are any collisions, set reward to -20
         rewards[collisions] = torch.tensor(-20, dtype=torch.float32)
+
+        # If there are no valid placements, exit early
+        if not torch.any(in_bounds & ~collisions):
+            return batch_state.grid, batch_state.present_count, rewards, dones
 
         # Otherwise update state using action
         for batch_idx in torch.where(in_bounds & ~collisions):
