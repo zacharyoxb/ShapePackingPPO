@@ -8,10 +8,10 @@ import torch
 @dataclass
 class Action:
     """ Holds current action """
-    present_idx: int
+    present_idx: torch.Tensor
     present: torch.Tensor
-    x: int
-    y: int
+    x: torch.Tensor
+    y: torch.Tensor
 
 
 def from_tensordict(tensordict: TensorDict) -> list[Action]:

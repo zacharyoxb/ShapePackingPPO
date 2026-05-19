@@ -145,29 +145,34 @@ class PresentEnv(EnvBase):
             self.batch_size or torch.Size([1]), dtype=torch.bool, device=batch_state.grid.device)
 
         # Check collisions for every in-bounds action
-        for i in torch.where(in_bounds):
-            x, y = int(x_coords[i]), int(y_coords[i])
-            grid_region = batch_state.grid[i, y:y+3, x:x+3]
-            present = batch_action.present[i, :, :]
-            collisions[i] = torch.any((present * grid_region) > 0)
+        for batch_idx in torch.where(in_bounds):
+            x, y = int(x_coords[batch_idx]), int(y_coords[batch_idx])
+            grid_region = batch_state.grid[batch_idx, y:y+3, x:x+3]
+            present = batch_action.present[batch_idx, :, :]
+            collisions[batch_idx] = torch.any((present * grid_region) > 0)
 
         # If there are any collisions, set reward to -20
+        rewards[collisions] = torch.tensor(-20, dtype=torch.float32)
 
-        # Otherwise place on grid
+        # Otherwise update state using action
+        for batch_idx in torch.where(in_bounds & ~collisions):
+            present_idx = int(batch_action.present_idx[batch_idx])
+            batch_state.present_count[present_idx] -= 1
+            batch_state.grid[batch_idx, y:y+3, x:x +
+                             3] = torch.maximum(grid_region, present)
 
-        batch_state.present_count[int(batch_action.present_idx)] -= 1
-        batch_state.grid[y:y+3, x:x+3] = torch.maximum(grid_region, present)
+        # For all valid placements give reward of 10
+        rewards[in_bounds & ~collisions] = torch.tensor(
+            10, dtype=torch.float32)
 
-        # Base reward
-        reward = torch.tensor(10, dtype=torch.float32)
+        # If all shapes are placed in any batch, add reward.
+        for batch_idx in torch.where(in_bounds & ~collisions):
+            if torch.sum(batch_state.present_count[batch_idx]) == 0:
+                rewards[batch_idx] += 200
+            else:
+                dones[batch_idx] = torch.tensor(False, dtype=torch.bool)
 
-        # Check if all shapes are placed
-        done = torch.tensor(False)
-        if torch.sum(batch_state.present_count) == 0:
-            done = torch.tensor(True)
-            reward = reward + 200
-
-        return batch_state.grid, batch_state.present_count, reward, done
+        return batch_state.grid, batch_state.present_count, rewards, dones
 
     def _step(self, tensordict: TensorDict) -> TensorDict:
         """ Execute one action - returns NEXT observation + reward + done """
