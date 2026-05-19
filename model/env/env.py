@@ -109,16 +109,20 @@ class PresentEnv(EnvBase):
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         w, h = batch_state.grid.shape[-2], batch_state.grid.shape[-1]
 
-        # Always unsqueeze present if there's no batches
+        # Always unsqueeze actions if there's no batches
         if not self.batch_size:
             batch_action.present = batch_action.present.unsqueeze(0)
-        # We only need to unsqueeze grid state once
+            batch_action.present_idx = batch_action.present_idx.unsqueeze(0)
+            batch_action.x = batch_action.x.unsqueeze(0)
+            batch_action.y = batch_action.y.unsqueeze(0)
+        # We only need to unsqueeze state once
         if batch_state.grid.dim() < 3:
             batch_state.grid = batch_state.grid.unsqueeze(0)
+            batch_state.present_count = batch_state.present_count.unsqueeze(0)
 
         # Round coords
-        x_coords = torch.round(torch.tensor(batch_action.x))
-        y_coords = torch.round(torch.tensor(batch_action.y))
+        x_coords = torch.round(batch_action.x)
+        y_coords = torch.round(batch_action.y)
 
         # In bounds mask
         in_bounds = torch.where(
@@ -148,7 +152,7 @@ class PresentEnv(EnvBase):
 
         # Check collisions for every in-bounds action
         for batch_idx in torch.where(in_bounds):
-            x, y = int(x_coords[batch_idx]), int(y_coords[batch_idx])
+            x, y = int(x_coords[batch_idx, :]), int(y_coords[batch_idx, :])
             grid_region = batch_state.grid[batch_idx, y:y+3, x:x+3]
             present = batch_action.present[batch_idx, :, :]
             collisions[batch_idx] = torch.any((present * grid_region) > 0)
@@ -162,8 +166,8 @@ class PresentEnv(EnvBase):
 
         # Otherwise update state using action
         for batch_idx in torch.where(in_bounds & ~collisions):
-            present_idx = int(batch_action.present_idx[batch_idx])
-            batch_state.present_count[present_idx] -= 1
+            present_idx = int(batch_action.present_idx[batch_idx, :])
+            batch_state.present_count[batch_idx, present_idx] -= 1
             batch_state.grid[batch_idx, y:y+3, x:x +
                              3] = torch.maximum(grid_region, present)
 
