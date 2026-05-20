@@ -2,7 +2,6 @@
 First Actor module. Outputs scores for each present orientation
 and the modulated grid of each orientation.
 """
-from itertools import chain
 from tensordict import TensorDict
 from torch import nn
 import torch
@@ -115,16 +114,12 @@ class PresentSelectionActor(nn.Module):
             all_logits.append(scores)
             all_orient_tds.append(orient_tds)
 
-        logits = torch.stack(
-            list(
-                chain.from_iterable(all_logits)
-            ),
+        logits = torch.cat(
+            all_logits,
             dim=1
         )
-        orients = torch.stack(
-            list(
-                chain.from_iterable(all_orient_tds)
-            ),
+        orients = torch.cat(
+            all_orient_tds,
             dim=1
         )
 
