@@ -46,35 +46,26 @@ class PresentPositionActor(nn.Module):
     def forward(self, choice_tensor, orient_td):
         """ Choose a placement position for the selected present in orients """
         # worker dim (if exists) and batch dim
-        batch_dims = choice_tensor.shape[:-1]
-        orient_idxs = torch.argmax(choice_tensor, dim=len(batch_dims))
+        batch_dim = orient_td.batch_size
+        orient_idxs = torch.argmax(choice_tensor, dim=1)
 
         orients = orient_td.get("orients")
 
-        # if there are no batch dims (singleton)
-        if len(batch_dims) == 0:
-            orient = orients
         # if batch dim is more than 1
-        elif batch_dims[-1] > 1:
-            orient = orients.gather(len(batch_dims), orient_idxs)
+        if batch_dim[0] != 1:
+            orient = orients.gather(1, orient_idxs)
         else:
-            orient = orients[:, orient_idxs]
+            orient = orients[:, orient_idxs].squeeze(1)
 
         present_idx = orient.get("present_idx")
         orient_idx = orient.get("orient_idx")
         orient_features = orient.get("orient_features")
         modulated_grid = orient.get("modulated_grid")
 
-        if len(batch_dims) > 0:
-            combined_features = torch.cat([
-                orient_features.view(*batch_dims, -1),
-                modulated_grid.view(*batch_dims, -1)
-            ], dim=-1)
-        else:
-            combined_features = torch.cat([
-                orient_features,
-                modulated_grid
-            ], dim=-1)
+        combined_features = torch.cat([
+            orient_features,
+            modulated_grid
+        ], dim=-1)
 
         x_mean = self.x_mean(combined_features)
         x_std = self.x_std(combined_features)

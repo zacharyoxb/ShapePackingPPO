@@ -51,8 +51,7 @@ class PresentSelectionActor(nn.Module):
         scores = []
         orient_tds = []
 
-        # get worker dim (if exists) and batch dim
-        batch_dims = grid_features.shape[:-1]
+        batch_dim = grid_features.shape[0]
 
         # If working on multiple samples, only modulated grid/score will differ
         for o_idx, orient_feat in enumerate(present_feat):
@@ -60,31 +59,25 @@ class PresentSelectionActor(nn.Module):
 
             # Add env batch dim first
             present_idx = torch.tensor(
-                p_idx, dtype=torch.uint8, device=self.device).unsqueeze(0).repeat(batch_dims[-1])
+                p_idx, dtype=torch.uint8, device=self.device
+            ).unsqueeze(0).repeat(
+                batch_dim
+            )
             orient_idx = torch.tensor(
-                o_idx, dtype=torch.uint8).unsqueeze(0).repeat(batch_dims[-1])
+                o_idx, dtype=torch.uint8
+            ).unsqueeze(0).repeat(
+                batch_dim
+            )
 
-            # if env batch dim is not a singleton, repeat it
-            if batch_dims[-1] > 1:
-                batched_orients = orient_feat.repeat(batch_dims[-1], 1, 1)
-            else:
-                batched_orients = orient_feat
-
-            # add extra dim to idxs
-            present_idx = present_idx.unsqueeze(0)
-            orient_idx = orient_idx.unsqueeze(0)
-
-            # if sample dim is non-singleton, repeat idxs/orients
-            if batch_dims[0] > 1:
-                present_idx = present_idx.repeat(batch_dims[0], 1)
-                orient_idx = orient_idx.repeat(batch_dims[0], 1)
+            # if batch dim is not a singleton, repeat it
+            batched_orients = orient_feat.repeat(batch_dim, 1)
 
             orient_td = TensorDict({
                 "present_idx": present_idx,
                 "orient_idx": orient_idx,
                 "orient_features": batched_orients,
                 "modulated_grid": modulated_grid
-            }, batch_size=batch_dims)
+            }, batch_size=batch_dim)
 
             scores.append(score)
             orient_tds.append(orient_td)
@@ -99,44 +92,34 @@ class PresentSelectionActor(nn.Module):
         # Get features
         grid_features = self.grid_extractor(grid)
 
-        # orient predictions
-        present_tuples = []
+        # Orient predictions
+        all_logits = []
+        all_orient_tds = []
 
+        # Mask out unavailable presents
         for p_idx, present_feat in enumerate(self.all_present_features):
-            if present_count.dim() > 2:
-                mask = (present_count[:, :, p_idx] != 0).unsqueeze(-1)
-            elif present_count.dim() > 1:
-                mask = present_count[:, p_idx] != 0
-            else:
-                mask = present_count[p_idx] != 0
-
-            if not mask.any():
-                continue
+            mask = present_count[:, p_idx] != 0
 
             masked_grids = torch.where(
                 mask, grid_features, torch.tensor(0.0, device=self.device))
 
-            present_tuple = self._process_present_orients(
+            scores, orient_tds = self._process_present_orients(
                 masked_grids, present_feat, p_idx)
-            present_tuples.append(present_tuple)
 
-        # transpose tuples
-        orient_logits, orient_tds = zip(
-            *present_tuples)
+            all_logits.append(scores)
+            all_orient_tds.append(orient_tds)
 
         logits = torch.stack(
             list(
-                chain.from_iterable(orient_logits)
+                chain.from_iterable(all_logits)
             ),
-            # 1 if no worker, 2 if worker
-            dim=present_count.dim() - 1
-        ).squeeze(-1)
+            dim=1
+        )
         orients = torch.stack(
             list(
-                chain.from_iterable(orient_tds)
+                chain.from_iterable(all_orient_tds)
             ),
-            # 1 if no worker, 2 if worker
-            dim=present_count.dim() - 1
+            dim=1
         )
 
         return TensorDict({
@@ -144,4 +127,4 @@ class PresentSelectionActor(nn.Module):
                 "logits": logits,
                 "orients": orients
             },
-        })
+        }, batch_size=grid.shape[0])

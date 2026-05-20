@@ -132,15 +132,16 @@ class PresentEnv(EnvBase):
             (y_coords + 2 < h),
             True,
             False
-        )
+        ).squeeze(0)
 
         # Init reward and done values
         rewards = torch.full(
-            self.batch_size or torch.Size([1, 1]), -40, dtype=torch.float32,
+            self.batch_size or torch.Size([1]), -40, dtype=torch.float32,
             device=batch_state.grid.device
         )
-        dones = torch.ones(self.batch_size or torch.Size([1, 1]), dtype=torch.bool,
-                           device=batch_state.grid.device)
+        dones = torch.ones(
+            self.batch_size or torch.Size([1]), dtype=torch.bool, device=batch_state.grid.device
+        )
 
         # If they are all out of bounds, return
         if not in_bounds.any():
@@ -148,7 +149,8 @@ class PresentEnv(EnvBase):
 
         # Initialise collisions
         collisions = torch.zeros(
-            self.batch_size or torch.Size([1, 1]), dtype=torch.bool, device=batch_state.grid.device)
+            self.batch_size or torch.Size([1]), dtype=torch.bool, device=batch_state.grid.device
+        )
 
         # Check collisions for every in-bounds action
         for batch_idx in torch.where(in_bounds):
@@ -166,7 +168,7 @@ class PresentEnv(EnvBase):
 
         # Otherwise update state using action
         for batch_idx in torch.where(in_bounds & ~collisions):
-            present_idx = int(batch_action.present_idx[batch_idx, :])
+            present_idx = int(batch_action.present_idx[batch_idx])
             batch_state.present_count[batch_idx, present_idx] -= 1
             batch_state.grid[batch_idx, y:y+3, x:x +
                              3] = torch.maximum(grid_region, present)
@@ -199,13 +201,19 @@ class PresentEnv(EnvBase):
         grids, present_counts, rewards, dones = zip(
             *results)
 
+        # Stack results
+        stacked_grids = torch.cat(grids, dim=0)
+        stacked_present_counts = torch.cat(present_counts, dim=0)
+        stacked_rewards = torch.cat(rewards, dim=0)
+        stacked_dones = torch.cat(dones, dim=0)
+
         return TensorDict({
             "observation": {
-                "grid": grids,
-                "present_count": present_counts
+                "grid": stacked_grids,
+                "present_count": stacked_present_counts
             },
-            "reward": rewards,
-            "done": dones
+            "reward": stacked_rewards,
+            "done": stacked_dones
         })
 
     def rollout(self, max_steps=1000, policy=None, callback=None, **_kwargs):
