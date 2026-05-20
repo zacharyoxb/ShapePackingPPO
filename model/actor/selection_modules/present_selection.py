@@ -48,8 +48,8 @@ class PresentSelectionActor(nn.Module):
         self.all_present_features = torch.stack(all_features)
 
     def _process_present_orients(self, grid_features, present_feat, p_idx):
-        scores = []
-        orient_tds = []
+        scores_list = []
+        orient_td_list = []
 
         batch_dim = grid_features.shape[0]
 
@@ -79,10 +79,13 @@ class PresentSelectionActor(nn.Module):
                 "modulated_grid": modulated_grid
             }, batch_size=batch_dim)
 
-            scores.append(score)
-            orient_tds.append(orient_td)
+            scores_list.append(score)
+            orient_td_list.append(orient_td)
 
-        return scores, orient_tds
+        scores_tensor = torch.stack(scores_list, dim=1)
+        orient_tds = torch.stack(orient_td_list, dim=1)
+
+        return scores_tensor, orient_tds
 
     def forward(self, tensordict):
         """ Gets scores for orientation / modulated grids for them """
@@ -98,13 +101,16 @@ class PresentSelectionActor(nn.Module):
 
         # Mask out unavailable presents
         for p_idx, present_feat in enumerate(self.all_present_features):
-            mask = present_count[:, p_idx] != 0
-
-            masked_grids = torch.where(
-                mask, grid_features, torch.tensor(0.0, device=self.device))
+            # Skip iteration if present is placed in all dims
+            mask = present_count[:, p_idx] == 0
+            if torch.all(mask):
+                continue
 
             scores, orient_tds = self._process_present_orients(
-                masked_grids, present_feat, p_idx)
+                grid_features, present_feat, p_idx)
+
+            # Cannot pick invalid presents
+            scores[mask, :, :] = torch.tensor(-torch.inf, dtype=torch.float32)
 
             all_logits.append(scores)
             all_orient_tds.append(orient_tds)
