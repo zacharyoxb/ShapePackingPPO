@@ -70,18 +70,14 @@ class PresentSelectionActor(nn.Module):
             else:
                 batched_orients = orient_feat
 
-            # if there is a sample dim, add another dim to idxs/orients
-            if len(batch_dims) > 1:
-                present_idx = present_idx.unsqueeze(0)
-                orient_idx = orient_idx.unsqueeze(0)
-                batched_orients = batched_orients.unsqueeze(0)
+            # add extra dim to idxs
+            present_idx = present_idx.unsqueeze(0)
+            orient_idx = orient_idx.unsqueeze(0)
 
             # if sample dim is non-singleton, repeat idxs/orients
             if batch_dims[0] > 1:
                 present_idx = present_idx.repeat(batch_dims[0], 1)
                 orient_idx = orient_idx.repeat(batch_dims[0], 1)
-                batched_orients = batched_orients.repeat(
-                    batch_dims[0], 1, 1, 1)
 
             orient_td = TensorDict({
                 "present_idx": present_idx,

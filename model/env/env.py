@@ -136,10 +136,10 @@ class PresentEnv(EnvBase):
 
         # Init reward and done values
         rewards = torch.full(
-            self.batch_size or torch.Size([1]), -40, dtype=torch.float32,
+            self.batch_size or torch.Size([1, 1]), -40, dtype=torch.float32,
             device=batch_state.grid.device
         )
-        dones = torch.ones(self.batch_size or torch.Size([1]), dtype=torch.bool,
+        dones = torch.ones(self.batch_size or torch.Size([1, 1]), dtype=torch.bool,
                            device=batch_state.grid.device)
 
         # If they are all out of bounds, return
@@ -148,7 +148,7 @@ class PresentEnv(EnvBase):
 
         # Initialise collisions
         collisions = torch.zeros(
-            self.batch_size or torch.Size([1]), dtype=torch.bool, device=batch_state.grid.device)
+            self.batch_size or torch.Size([1, 1]), dtype=torch.bool, device=batch_state.grid.device)
 
         # Check collisions for every in-bounds action
         for batch_idx in torch.where(in_bounds):
@@ -199,22 +199,13 @@ class PresentEnv(EnvBase):
         grids, present_counts, rewards, dones = zip(
             *results)
 
-        # If batched, stack results
-        batch_size = tensordict.batch_size[0] if tensordict.batch_size else 1
-
-        grid = torch.stack(grids) if batch_size > 1 else grids[0]
-        present_count = torch.stack(
-            present_counts) if batch_size > 1 else present_counts[0]
-        reward = torch.stack(rewards) if batch_size > 1 else rewards[0]
-        done = torch.stack(dones) if batch_size > 1 else dones[0]
-
         return TensorDict({
             "observation": {
-                "grid": grid,
-                "present_count": present_count
+                "grid": grids,
+                "present_count": present_counts
             },
-            "reward": reward,
-            "done": done
+            "reward": rewards,
+            "done": dones
         })
 
     def rollout(self, max_steps=1000, policy=None, callback=None, **_kwargs):
