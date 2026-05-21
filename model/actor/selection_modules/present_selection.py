@@ -46,6 +46,7 @@ class PresentSelectionActor(nn.Module):
 
         self.all_present_features = torch.stack(all_features)
 
+    # Returns with dims [BATCH] [ORIENTATION DIM]
     def _process_present_orients(self, grid_features, present_feat, p_idx):
         scores_list = []
         orient_td_list = []
@@ -109,7 +110,7 @@ class PresentSelectionActor(nn.Module):
                 grid_features, present_feat, p_idx)
 
             # Cannot pick invalid presents
-            scores[mask, :, :] = torch.tensor(-torch.inf, dtype=torch.float32)
+            scores[mask, :] = torch.tensor(-torch.inf, dtype=torch.float32)
 
             all_logits.append(scores)
             all_orient_tds.append(orient_tds)

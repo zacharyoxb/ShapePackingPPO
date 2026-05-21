@@ -45,7 +45,6 @@ class PresentPositionActor(nn.Module):
 
     def forward(self, choice_tensor, orient_td):
         """ Choose a placement position for the selected present in orients """
-        # worker dim (if exists) and batch dim
         batch_dim = orient_td.batch_size
         orient_idxs = torch.argmax(choice_tensor, dim=1)
 
