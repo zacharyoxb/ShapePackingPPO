@@ -103,7 +103,8 @@ class PresentSelectionActor(nn.Module):
         # Mask out unavailable presents
         for p_idx, present_feat in enumerate(self.all_present_features):
             # Skip iteration if present is placed in all dims
-            mask = present_count[:, p_idx] == 0
+            mask = present_count[..., p_idx] == 0
+
             if torch.all(mask):
                 continue
 
