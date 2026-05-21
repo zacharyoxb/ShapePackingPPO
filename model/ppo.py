@@ -185,7 +185,7 @@ class PPO:
                 pbar.set_description(
                     "Current batch progress:  " + ", ".join([cum_reward_str, lr_str]))
 
-                self.scheduler.step()
+            self.scheduler.step()
 
             # checkpoint model now current data has been trained on
             self.save(logs, True)
