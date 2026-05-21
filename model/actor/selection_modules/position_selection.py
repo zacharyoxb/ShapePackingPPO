@@ -66,10 +66,10 @@ class PresentPositionActor(nn.Module):
             modulated_grid
         ], dim=-1)
 
-        x_mean = self.x_mean(combined_features)
-        x_std = self.x_std(combined_features)
-        y_mean = self.y_mean(combined_features)
-        y_std = self.y_std(combined_features)
+        x_mean = self.x_mean(combined_features).squeeze(1)
+        x_std = self.x_std(combined_features).squeeze(1)
+        y_mean = self.y_mean(combined_features).squeeze(1)
+        y_std = self.y_std(combined_features).squeeze(1)
 
         # get present for partial action output
         if present_idx.numel() < 2:

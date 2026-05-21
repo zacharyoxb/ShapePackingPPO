@@ -75,9 +75,9 @@ class PresentEnv(EnvBase):
 
         # Reward and done specs
         self.reward_spec = Unbounded(shape=torch.Size(
-            [-1]), dtype=torch.float32, device=self.device)
+            [1]), dtype=torch.float32, device=self.device)
         self.done_spec = Categorical(
-            n=2, shape=torch.Size([-1]), dtype=torch.bool, device=self.device)  # 0/1 for False/True
+            n=2, shape=torch.Size([1]), dtype=torch.bool, device=self.device)  # 0/1 for False/True
 
     def _set_seed(self, seed: int | None = None):
         """
@@ -102,7 +102,7 @@ class PresentEnv(EnvBase):
             },
         }, device=self.device)
 
-    def _handle_batches(
+    def _handle_step(
             self,
             tensordict,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -112,81 +112,55 @@ class PresentEnv(EnvBase):
 
         present_idx = tensordict.get(("action", "present_idx"))
         present = tensordict.get(("action", "present"))
-        x = tensordict.get(("action", "x"))
-        y = tensordict.get(("action", "y"))
+        x_coord = tensordict.get(("action", "x"))
+        y_coord = tensordict.get(("action", "y"))
 
         w, h = grid.shape[-2], grid.shape[-1]
 
         # Round coords
-        x_coords = torch.round(x)
-        y_coords = torch.round(y)
+        x = int(torch.round(x_coord))
+        y = int(torch.round(y_coord))
 
-        # In bounds mask
-        in_bounds = torch.where(
-            (x_coords >= 0) &
-            (y_coords >= 0) &
-            (x_coords + 2 < w) &
-            (y_coords + 2 < h),
-            True,
-            False
-        ).squeeze(0)
+        # In bounds check
+        in_bounds = (x_coord >= 0) & (y_coord >= 0) & (
+            x_coord + 2 < w) & (y_coord + 2 < h)
 
         # Init reward and done values
-        rewards = torch.full(
-            self.batch_size or torch.Size([1]), -40, dtype=torch.float32,
-            device=grid.device
-        )
-        dones = torch.ones(
-            self.batch_size or torch.Size([1]), dtype=torch.bool, device=grid.device
-        )
+        reward = torch.tensor(-40, dtype=torch.float32).unsqueeze(0)
+        done = torch.tensor(True, dtype=torch.bool).unsqueeze(0)
 
-        # If they are all out of bounds, return
-        if not in_bounds.any():
-            return grid, present_count, rewards, dones
+        # If out of bounds, return as-is
+        if not in_bounds:
+            return grid, present_count, reward, done
 
-        # Initialise collisions
-        collisions = torch.zeros(
-            self.batch_size or torch.Size([1]), dtype=torch.bool, device=grid.device
-        )
-
-        # Check collisions for every in-bounds action
-        for batch_idx in torch.where(in_bounds):
-            x, y = int(x_coords[batch_idx]), int(y_coords[batch_idx])
-            grid_region = grid[batch_idx, :, y:y+3, x:x+3]
-            present = present[batch_idx, :, :]
-            collisions[batch_idx] = torch.any((present * grid_region) > 0)
+        grid_region = grid[:, y:y+3, x:x+3]
+        collision = (present * grid_region) > 0
 
         # If there are any collisions, set reward to -20
-        rewards[collisions] = torch.tensor(-20, dtype=torch.float32)
-
-        # If there are no valid placements, exit early
-        if not torch.any(in_bounds & ~collisions):
-            return grid, present_count, rewards, dones
+        if torch.any(collision):
+            reward = torch.tensor(-20, dtype=torch.float32).unsqueeze(0)
+            return grid, present_count, reward, done
 
         # Otherwise update state using action
-        for batch_idx in torch.where(in_bounds & ~collisions):
-            i_present_idx = int(present_idx[batch_idx])
-            present_count[batch_idx, i_present_idx] -= 1
-            grid[batch_idx, y:y+3, x:x +
-                 3] = torch.maximum(grid_region, present)
+        present_idx = int(present_idx)
+        present_count[present_idx] -= 1
+        grid[:, y:y+3, x:x + 3] = torch.maximum(grid_region, present)
 
-        # For all valid placements give reward of 10
-        rewards[in_bounds & ~collisions] = torch.tensor(
-            10, dtype=torch.float32)
+        # For a valid placement give reward of 10
+        reward = torch.tensor(10, dtype=torch.float32).unsqueeze(0)
 
-        # If all shapes are placed in any batch, add reward.
-        for batch_idx in torch.where(in_bounds & ~collisions):
-            if torch.sum(present_count[batch_idx]) == 0:
-                rewards[batch_idx] += 200
-            else:
-                dones[batch_idx] = torch.tensor(False, dtype=torch.bool)
+        # If all presents are placed, give an extra 200 reward
+        if torch.sum(present_count) == 0:
+            reward += 200
+        else:
+            done = torch.tensor(False, dtype=torch.bool).unsqueeze(0)
 
-        return grid, present_count, rewards, dones
+        return grid, present_count, reward, done
 
     def _step(self, tensordict: TensorDict) -> TensorDict:
         """ Execute one action - returns NEXT observation + reward + done """
 
-        new_grid, new_present_count, rewards, dones = self._handle_batches(
+        new_grid, new_present_count, reward, done = self._handle_step(
             tensordict)
 
         return TensorDict({
@@ -194,8 +168,8 @@ class PresentEnv(EnvBase):
                 "grid": new_grid,
                 "present_count": new_present_count
             },
-            "reward": rewards,
-            "done": dones
+            "reward": reward,
+            "done": done
         })
 
     def rollout(self, max_steps=1000, policy=None, callback=None, **_kwargs):
