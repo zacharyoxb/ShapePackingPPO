@@ -91,6 +91,7 @@ class PresentSelectionActor(nn.Module):
         """ Gets scores for orientation / modulated grids for them """
         grid = tensordict.get("grid")
         present_count = tensordict.get("present_count")
+        batch_size = grid.shape[0]
 
         # Get features
         grid_features = self.grid_extractor(grid)
@@ -129,4 +130,4 @@ class PresentSelectionActor(nn.Module):
                 "logits": logits,
                 "orients": orients
             },
-        }, batch_size=grid.shape[0])
+        }, batch_size=batch_size)

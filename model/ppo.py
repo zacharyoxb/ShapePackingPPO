@@ -113,21 +113,21 @@ class PPO:
 
     def train(self):
         """ Train the model """
-
         logs = defaultdict(list)
 
         # for every set of data in the generator
         for td in tqdm(self.input_td, desc="Total progress", position=0):
+            env = PresentEnv.make_parallel_env(
+                start_state=td,
+                num_workers=self.config.num_workers,
+                device=torch.device("cpu")
+            )
+
             collector = SyncDataCollector(
-                PresentEnv.make_parallel_env,  # type: ignore
+                env,
                 self.policy_module,
                 frames_per_batch=self.config.frames_per_batch,
                 total_frames=self.config.total_frames,
-                create_env_kwargs={
-                    "start_state": td,
-                    "num_workers": self.config.num_workers,
-                    "device": torch.device("cpu")
-                },
                 # prevents linux CUDA permission err
                 device=torch.device("cpu"),
                 storing_device=torch.device("cpu"),
