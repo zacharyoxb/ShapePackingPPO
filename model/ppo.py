@@ -87,30 +87,6 @@ class PPO:
             self.optim.load_state_dict(best.optim_state)
             self.scheduler.load_state_dict(best.scheduler_state)
 
-    def _process_sample(self, sample):
-        # Run forward pass of loss module
-        loss_vals = self.loss_module(sample)
-
-        loss = (
-            loss_vals["loss_objective"]
-            + loss_vals["loss_critic"]
-            + loss_vals["loss_entropy"]
-        )
-
-        # Optimise
-        loss.backward()
-
-        # Clip to prevent exploding gradients
-        torch.nn.utils.clip_grad_norm_(
-            self.loss_module.parameters(), self.config.max_grad_norm
-        )
-
-        # Run the optimiser
-        self.optim.step()
-
-        # Clear accumulated gradients
-        self.optim.zero_grad()
-
     def train(self):
         """ Train the model """
         logs = defaultdict(list)
@@ -148,14 +124,36 @@ class PPO:
 
             for i, batch in enumerate(collector):
                 dev_batch = batch.to(self.training_device)
+
                 for _ in range(self.config.num_epochs):
                     self.advantage_module(dev_batch)
                     replay_buffer.extend(batch)
+
                     for _ in range(self.config.frames_per_batch // self.config.sub_batch_size):
                         sample = replay_buffer.sample(
                             self.config.sub_batch_size)
                         sample = sample.to(self.training_device)
-                        self._process_sample(sample)
+
+                        self.optim.zero_grad()
+
+                        loss_vals = self.loss_module(sample)
+
+                        loss = (
+                            loss_vals["loss_objective"]
+                            + loss_vals["loss_critic"]
+                            + loss_vals["loss_entropy"]
+                        )
+
+                        loss.backward()
+
+                        # Clip to prevent exploding gradients
+                        torch.nn.utils.clip_grad_norm_(
+                            self.loss_module.parameters(), self.config.max_grad_norm
+                        )
+
+                        self.optim.step()
+
+                    self.scheduler.step()
 
                 # Processed all epochs, log data
                 logs["reward"].append(
@@ -184,8 +182,6 @@ class PPO:
 
                 pbar.set_description(
                     "Current batch progress:  " + ", ".join([cum_reward_str, lr_str]))
-
-            self.scheduler.step()
 
             # checkpoint model now current data has been trained on
             self.save(logs, True)
