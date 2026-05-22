@@ -45,16 +45,20 @@ class PresentPositionActor(nn.Module):
 
     def forward(self, choice_tensor, orient_td):
         """ Choose a placement position for the selected present in orients """
-        batch_dim = orient_td.batch_size
-        orient_idxs = torch.argmax(choice_tensor, dim=1)
+        batch_dims = orient_td.batch_size
 
         orients = orient_td.get("orients")
 
-        # if batch dim is more than 1
-        if batch_dim[0] != 1:
-            orient = orients.gather(1, orient_idxs)
+        # Map away worker dim if necessary
+        if len(batch_dims) > 1:
+            orient_idxs = torch.vmap(
+                torch.argmax
+            )(choice_tensor, dim=1)
         else:
-            orient = orients[:, orient_idxs].squeeze(1)
+            orient_idxs = torch.argmax(choice_tensor, dim=1)
+
+        # Get orient, squeeze out orient dim of 96->1
+        orient = orients[..., orient_idxs].squeeze(-1)
 
         present_idx = orient.get("present_idx")
         orient_idx = orient.get("orient_idx")
@@ -66,10 +70,16 @@ class PresentPositionActor(nn.Module):
             modulated_grid
         ], dim=-1)
 
-        x_mean = self.x_mean(combined_features).squeeze(1)
-        x_std = self.x_std(combined_features).squeeze(1)
-        y_mean = self.y_mean(combined_features).squeeze(1)
-        y_std = self.y_std(combined_features).squeeze(1)
+        if len(batch_dims) > 1:
+            x_mean = torch.vmap(self.x_mean)(combined_features).squeeze(-1)
+            x_std = torch.vmap(self.x_std)(combined_features).squeeze(-1)
+            y_mean = torch.vmap(self.y_mean)(combined_features).squeeze(-1)
+            y_std = torch.vmap(self.y_std)(combined_features).squeeze(-1)
+        else:
+            x_mean = self.x_mean(combined_features).squeeze(-1)
+            x_std = self.x_std(combined_features).squeeze(-1)
+            y_mean = self.y_mean(combined_features).squeeze(-1)
+            y_std = self.y_std(combined_features).squeeze(-1)
 
         # get present for partial action output
         if present_idx.numel() < 2:
