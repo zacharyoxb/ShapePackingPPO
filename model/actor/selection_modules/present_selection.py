@@ -46,7 +46,7 @@ class PresentSelectionActor(nn.Module):
 
         self.all_present_features = torch.stack(all_features)
 
-    # Returns with dims [BATCH] [ORIENTATION DIM]
+    # Returns with dims [BATCH] [ORIENTATION DIM] [SINGLETON DIM]
     def _process_present_orients(self, grid_features, present_feat, p_idx):
         scores_list = []
         orient_td_list = []
@@ -77,7 +77,7 @@ class PresentSelectionActor(nn.Module):
             scores_list.append(score)
             orient_td_list.append(orient_td)
 
-        scores_tensor = torch.stack(scores_list, dim=-1)
+        scores_tensor = torch.stack(scores_list, dim=-2)
         orient_tds = torch.stack(orient_td_list, dim=-1)
 
         return scores_tensor, orient_tds
@@ -116,11 +116,11 @@ class PresentSelectionActor(nn.Module):
 
         logits = torch.cat(
             all_logits,
-            dim=1
+            dim=-2
         )
         orients = torch.cat(
             all_orient_tds,
-            dim=1
+            dim=-1
         )
 
         return TensorDict({

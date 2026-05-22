@@ -44,7 +44,4 @@ class FiLM(nn.Module):
         # Score this shape given its modulated view of grid
         shape_score = self.scoring_net(modulated_grid)
 
-        # The only dim in score should be the batch dim
-        shape_score = shape_score.squeeze(1)
-
         return shape_score, modulated_grid
