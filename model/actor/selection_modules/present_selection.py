@@ -87,11 +87,17 @@ class PresentSelectionActor(nn.Module):
         grid = tensordict.get("grid")
         present_count = tensordict.get("present_count")
 
-        # Get features (handle worker dim if necessary)
-        if grid.dim() > 4:
-            grid_features = torch.vmap(self.grid_extractor)(grid)
-        else:
+        # If rollout (no batch dim)
+        if grid.dim() < 4:
+            # Give grid features / present count a singleton batch dim
+            grid_features = self.grid_extractor(grid.unsqueeze(0))
+            present_count = present_count.unsqueeze(0)
+        # If singular batch dim
+        elif grid.dim() < 5:
             grid_features = self.grid_extractor(grid)
+        # If worker and batch dim
+        else:
+            grid_features = torch.vmap(self.grid_extractor)(grid)
 
         # Orient predictions
         all_logits = []
