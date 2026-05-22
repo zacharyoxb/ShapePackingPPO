@@ -51,21 +51,18 @@ class PresentSelectionActor(nn.Module):
         scores_list = []
         orient_td_list = []
 
+        if grid_features.dim() > 2:
+            batch_dims = grid_features.shape[:2]
+        else:
+            batch_dims = (grid_features.shape[0],)
+
         # If working on multiple samples, only modulated grid/score will differ
         for o_idx, orient_feat in enumerate(present_feat):
-            # Use vmap on worker dim if exists
-            if orient_feat.dim() > 2:
-                score, modulated_grid = torch.vmap(
-                    self.film
-                )(grid_features, orient_feat)
-                batch_dims = grid_features.shape[:2]
-            else:
-                score, modulated_grid = self.film(grid_features, orient_feat)
-                batch_dims = (grid_features.shape[0],)
+            # modulate grid
+            score, modulated_grid = self.film(grid_features, orient_feat)
 
-            # Add env batch dim first
-            present_idx = torch.full(batch_dims, p_idx, dtype=torch.float32)
-            orient_idx = torch.full(batch_dims, o_idx, dtype=torch.float32)
+            present_idx = torch.full(batch_dims, p_idx, dtype=torch.int)
+            orient_idx = torch.full(batch_dims, o_idx, dtype=torch.int)
 
             # if batch dim is not a singleton, repeat it
             batched_orients = orient_feat.repeat(*batch_dims, 1)
@@ -80,8 +77,8 @@ class PresentSelectionActor(nn.Module):
             scores_list.append(score)
             orient_td_list.append(orient_td)
 
-        scores_tensor = torch.stack(scores_list, dim=1)
-        orient_tds = torch.stack(orient_td_list, dim=1)
+        scores_tensor = torch.stack(scores_list, dim=-1)
+        orient_tds = torch.stack(orient_td_list, dim=-1)
 
         return scores_tensor, orient_tds
 
@@ -112,7 +109,7 @@ class PresentSelectionActor(nn.Module):
                 grid_features, present_feat, p_idx)
 
             # Cannot pick invalid presents
-            scores[mask, :] = torch.tensor(-torch.inf, dtype=torch.float32)
+            scores[mask, ...] = torch.tensor(-torch.inf, dtype=torch.float32)
 
             all_logits.append(scores)
             all_orient_tds.append(orient_tds)
