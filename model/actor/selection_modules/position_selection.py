@@ -49,16 +49,15 @@ class PresentPositionActor(nn.Module):
 
         orients = orient_td.get("orients")
 
-        # Map away worker dim if necessary
-        if len(batch_dims) > 1:
-            orient_idxs = torch.vmap(
-                torch.argmax
-            )(choice_tensor, dim=1)
-        else:
-            orient_idxs = torch.argmax(choice_tensor, dim=1)
+        orient_idxs = torch.argmax(
+            choice_tensor, dim=-1)
 
-        # Get orient, squeeze out orient dim of 96->1
-        orient = orients[..., orient_idxs].squeeze(-1)
+        if batch_dims:
+            batch_idx = torch.meshgrid(
+                *[torch.arange(d) for d in batch_dims], indexing='ij')
+            orient = orients[(*batch_idx, orient_idxs)]
+        else:
+            orient = orients[..., orient_idxs].squeeze(1)
 
         present_idx = orient.get("present_idx")
         orient_idx = orient.get("orient_idx")

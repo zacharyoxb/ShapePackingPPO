@@ -8,7 +8,7 @@ import torch
 @dataclass
 class ProcessingParameters:
     """ Parameters referring to processing power used. """
-    num_workers = 1
+    num_workers = 5  # leave it in this for now, env is not the bottleneck
 
 
 @dataclass
@@ -28,14 +28,14 @@ class Hyperparameters:
 @dataclass
 class DataCollection:
     """ Data collection parameters """
-    frames_per_batch = 10
+    frames_per_batch = 50
     total_frames = 1000
 
 
 @dataclass
 class PPOParameters:
     """ Loss function weights and coefficients """
-    sub_batch_size = 2
+    sub_batch_size = 10
     num_epochs = 10
     clip_epsilon = (
         0.2
