@@ -70,15 +70,19 @@ class PresentPositionActor(nn.Module):
         ], dim=-1)
 
         if len(batch_dims) > 1:
-            x_mean = torch.vmap(self.x_mean)(combined_features).squeeze(-1)
-            x_std = torch.vmap(self.x_std)(combined_features).squeeze(-1)
-            y_mean = torch.vmap(self.y_mean)(combined_features).squeeze(-1)
-            y_std = torch.vmap(self.y_std)(combined_features).squeeze(-1)
+            x_mean = torch.vmap(self.x_mean)(
+                combined_features).squeeze(-1)
+            x_std = torch.vmap(self.x_std)(
+                combined_features).squeeze(-1) + 1e-6
+            y_mean = torch.vmap(self.y_mean)(
+                combined_features).squeeze(-1)
+            y_std = torch.vmap(self.y_std)(
+                combined_features).squeeze(-1) + 1e-6
         else:
             x_mean = self.x_mean(combined_features).squeeze(-1)
-            x_std = self.x_std(combined_features).squeeze(-1)
+            x_std = self.x_std(combined_features).squeeze(-1) + 1e-6
             y_mean = self.y_mean(combined_features).squeeze(-1)
-            y_std = self.y_std(combined_features).squeeze(-1)
+            y_std = self.y_std(combined_features).squeeze(-1) + 1e-6
 
         # get present for partial action output
         if present_idx.numel() < 2:

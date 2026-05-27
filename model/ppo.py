@@ -91,7 +91,7 @@ class PPO:
         """ Train the model """
         logs = defaultdict(list)
 
-        # for every set of data in the generator
+        # for every set of data in the input
         for td in tqdm(self.input_td, desc="Total progress", position=0):
             env = PresentEnv.make_parallel_env(
                 start_state=td,
@@ -124,10 +124,10 @@ class PPO:
 
             for i, batch in enumerate(collector):
                 dev_batch = batch.to(self.training_device)
+                replay_buffer.extend(batch)
 
                 for _ in range(self.config.num_epochs):
                     self.advantage_module(dev_batch)
-                    replay_buffer.extend(batch)
 
                     for _ in range(self.config.frames_per_batch // self.config.sub_batch_size):
                         sample = replay_buffer.sample(
