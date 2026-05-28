@@ -112,6 +112,7 @@ class PPO:
             pbar = tqdm(total=self.config.total_frames,
                         desc="Current batch progress", position=1)
 
+            # Collect data
             for i, batch in enumerate(collector):
                 batch = batch.to(self.training_device)
 
