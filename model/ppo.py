@@ -79,7 +79,7 @@ class PPO:
         if best:
             self.policy_module.load_state_dict(best.policy_state)
             self.value_module.load_state_dict(best.value_state)
-            self.loss_module.load_state_dict(best.loss_state)
+            self.loss_module.load_state_dict(best.loss_state, strict=False)
             self.policy_module.eval()
             self.value_module.eval()
             self.loss_module.eval()
