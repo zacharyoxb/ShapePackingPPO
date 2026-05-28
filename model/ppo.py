@@ -4,7 +4,6 @@ from collections import defaultdict
 
 import torch
 from tqdm import tqdm
-from torchrl.data import ReplayBuffer, LazyMemmapStorage, SamplerWithoutReplacement
 from torchrl.collectors import SyncDataCollector
 from torchrl.objectives.value import GAE
 from torchrl.objectives import ClipPPOLoss
@@ -110,33 +109,21 @@ class PPO:
                 policy_device=self.training_device,
             )
 
-            # Note: memmap is cpu - only
-            replay_buffer = ReplayBuffer(
-                storage=LazyMemmapStorage(
-                    max_size=self.config.frames_per_batch,
-                    device=torch.device("cpu")
-                ),
-                sampler=SamplerWithoutReplacement(),
-            )
-
             pbar = tqdm(total=self.config.total_frames,
                         desc="Current batch progress", position=1)
 
             for i, batch in enumerate(collector):
-                dev_batch = batch.to(self.training_device)
-                replay_buffer.extend(batch)
+                batch = batch.to(self.training_device)
 
+                # Compute advantages
+                self.advantage_module(batch)
+
+                # Learn from this batch
                 for _ in range(self.config.num_epochs):
-                    self.advantage_module(dev_batch)
+                    # Split batch into minibatches
+                    for minibatch in batch.split(self.config.sub_batch_size):
 
-                    for _ in range(self.config.frames_per_batch // self.config.sub_batch_size):
-                        sample = replay_buffer.sample(
-                            self.config.sub_batch_size)
-                        sample = sample.to(self.training_device)
-
-                        self.optim.zero_grad()
-
-                        loss_vals = self.loss_module(sample)
+                        loss_vals = self.loss_module(minibatch)
 
                         loss = (
                             loss_vals["loss_objective"]
@@ -152,15 +139,16 @@ class PPO:
                         )
 
                         self.optim.step()
+                        self.optim.zero_grad()
 
                     self.scheduler.step()
 
                 # Processed all epochs, log data
                 logs["reward"].append(
-                    dev_batch["next", "reward"].mean().item())
-                pbar.update(dev_batch.numel())
+                    batch["next", "reward"].mean().item())
+                pbar.update(batch.numel())
                 cum_reward_str = (
-                    f"average reward={logs['reward'][-1]: 4.2f} (init={logs['reward'][0]: 4.2f})"
+                    f"average reward={logs['reward'][-1]: 4.2f}"
                 )
                 logs["lr"].append(self.optim.param_groups[0]["lr"])
                 lr_str = f"lr policy: {logs['lr'][-1]: 4.5f}"
