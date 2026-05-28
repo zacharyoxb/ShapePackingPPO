@@ -85,11 +85,31 @@ class ModelSaveManager:
 
         return best_model.get_data()
 
+    def load_latest(self) -> Optional[ModelData]:
+        """ Loads most recent model """
+        if not self._instance:
+            return None
+
+        # no saved models/checkpoints available
+        if not self.models and not self.ckpts:
+            return None
+
+        # get most recent model/checkpoint
+        if self.models:
+            most_recent = max(
+                self.models, key=lambda model: model.get_save_time())
+        else:
+            most_recent = max(
+                self.ckpts, key=lambda model: model.get_save_time())
+
+        return most_recent.get_data()
+
     def ckpt_cleanup(self):
-        """ Deletes all but the 5 best checkpoints. """
-        sorted_ckpts = sorted(self.ckpts, reverse=True)
-        keep = sorted_ckpts[:5]
-        to_delete = sorted_ckpts[5:]
+        """ Deletes all but the 5 most recent checkpoints. """
+        sorted_ckpts = sorted(
+            self.ckpts, key=lambda model: model.get_save_time())
+        keep = sorted_ckpts[5:]
+        to_delete = sorted_ckpts[:5]
         for ckpt in to_delete:
             ckpt.unlink()
         self.ckpts = keep

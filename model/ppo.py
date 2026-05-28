@@ -73,7 +73,7 @@ class PPO:
     def load_from_models(self):
         """ If model already exists in full_models, load it """
         manager = ModelSaveManager()
-        best = manager.load_best()
+        best = manager.load_latest()
 
         if best:
             self.policy_module.load_state_dict(best.policy_state)

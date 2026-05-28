@@ -29,6 +29,10 @@ class ModelDataWrapper:
 
         return self._data
 
+    def get_save_time(self) -> float:
+        """ Get the time the data was saved """
+        return self.path.stat().st_mtime
+
     def save_to_disk(self, data):
         """ Save to disk """
         torch.save(data, self.path)
