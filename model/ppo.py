@@ -183,7 +183,7 @@ class PPO:
             overall_progress.update(1)
             avg_change = torch.diff(torch.tensor(logs["reward"])).mean()
             overall_progress.set_description(
-                f"Total Progress (Avg Reward Change {avg_change:+.3f})")
+                f"Total Progress (Avg Reward Change {avg_change:+.4f})")
 
             # checkpoint model now current data has been trained on
             self.save(logs, True)
