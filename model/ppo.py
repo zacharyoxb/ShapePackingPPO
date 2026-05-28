@@ -91,7 +91,7 @@ class PPO:
         logs = defaultdict(list)
 
         # for every set of data in the input
-        for td in tqdm(self.input_td, desc="Total progress", position=0):
+        for td in tqdm(self.input_td, desc="Total progress", position=0, leave=True):
             env = PresentEnv.make_parallel_env(
                 start_state=td,
                 num_workers=self.config.num_workers,
@@ -109,8 +109,12 @@ class PPO:
                 policy_device=self.training_device,
             )
 
-            pbar = tqdm(total=self.config.total_frames,
-                        desc="Current batch progress", position=1)
+            pbar = tqdm(
+                total=self.config.total_frames,
+                desc="Current batch progress",
+                position=1,
+                leave=False
+            )
 
             # Collect data
             for i, batch in enumerate(collector):
