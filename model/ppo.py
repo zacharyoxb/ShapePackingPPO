@@ -116,11 +116,11 @@ class PPO:
             for i, batch in enumerate(collector):
                 batch = batch.to(self.training_device)
 
-                # Compute advantages
-                self.advantage_module(batch)
-
                 # Learn from this batch
                 for _ in range(self.config.num_epochs):
+                    # Compute advantages
+                    self.advantage_module(batch)
+
                     # Split batch into minibatches
                     for minibatch in batch.split(self.config.sub_batch_size):
 
