@@ -90,8 +90,11 @@ class PPO:
         """ Train the model """
         logs = defaultdict(list)
 
+        overall_progress = tqdm(
+            total=len(self.input_td), desc="Total Progress", position=0, leave=True)
+
         # for every set of data in the input
-        for td in tqdm(self.input_td, desc="Total progress", position=0, leave=True):
+        for td in self.input_td:
             env = PresentEnv.make_parallel_env(
                 start_state=td,
                 num_workers=self.config.num_workers,
@@ -109,9 +112,9 @@ class PPO:
                 policy_device=self.training_device,
             )
 
-            pbar = tqdm(
+            batch_progress = tqdm(
                 total=self.config.total_frames,
-                desc="Current batch progress",
+                desc="Current Batch Progress",
                 position=1,
                 leave=False
             )
@@ -151,7 +154,7 @@ class PPO:
                 # Processed all epochs, log data
                 logs["reward"].append(
                     batch["next", "reward"].mean().item())
-                pbar.update(batch.numel())
+                batch_progress.update(batch.numel())
                 cum_reward_str = (
                     f"average reward={logs['reward'][-1]: 4.2f}"
                 )
@@ -173,8 +176,14 @@ class PPO:
 
                         del eval_rollout
 
-                pbar.set_description(
-                    "Current batch progress:  " + ", ".join([cum_reward_str, lr_str]))
+                batch_progress.set_description(
+                    "Current Batch Progress  (" + ", ".join([cum_reward_str, lr_str]) + ")")
+
+            # display avg change in reward across all iterations
+            overall_progress.update(1)
+            avg_change = torch.diff(torch.tensor(logs["reward"])).mean()
+            overall_progress.set_description(
+                f"Total Progress (Avg Reward Change {avg_change:+.3f})")
 
             # checkpoint model now current data has been trained on
             self.save(logs, True)
