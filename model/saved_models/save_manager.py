@@ -107,9 +107,9 @@ class ModelSaveManager:
     def ckpt_cleanup(self):
         """ Deletes all but the 5 most recent checkpoints. """
         sorted_ckpts = sorted(
-            self.ckpts, key=lambda model: model.get_save_time())
-        keep = sorted_ckpts[5:]
-        to_delete = sorted_ckpts[:5]
+            self.ckpts, key=lambda model: model.get_save_time(), reverse=True)
+        keep = sorted_ckpts[:5]
+        to_delete = sorted_ckpts[5:]
         for ckpt in to_delete:
             ckpt.unlink()
         self.ckpts = keep
