@@ -113,9 +113,9 @@ class PPO:
             policy_device=self.training_device,
         )
 
-        batch_progress = tqdm(
+        dataset_progress = tqdm(
             total=self.config.total_frames,
-            desc="Current Batch Progress",
+            desc="Current Dataset Progress",
             position=1,
             leave=False
         )
@@ -155,7 +155,7 @@ class PPO:
             # Processed all epochs, log data
             logs["reward"].append(
                 batch["next", "reward"].mean().item())
-            batch_progress.update(batch.numel())
+            dataset_progress.update(batch.numel())
             cum_reward_str = (
                 f"average reward={logs['reward'][-1]: 4.2f}"
             )
@@ -180,7 +180,7 @@ class PPO:
             if i > 0 and i % 50 == 0:
                 self.save(logs, True)
 
-            batch_progress.set_description(
+            dataset_progress.set_description(
                 "Current Batch Progress  (" + ", ".join([cum_reward_str, lr_str]) + ")")
 
         self.save(logs, False)
