@@ -8,7 +8,7 @@ import torch
 @dataclass
 class ProcessingParameters:
     """ Parameters referring to processing power used. """
-    num_workers = 5  # leave it in this for now, env is not the bottleneck
+    num_workers = 5
 
 
 @dataclass
@@ -20,7 +20,6 @@ class Hyperparameters:
         if torch.cuda.is_available() and not is_fork
         else torch.device("cpu")
     )
-    num_cells = 256
     lr = 3e-4
     max_grad_norm = 0.5
 
@@ -69,11 +68,6 @@ class PPOConfig:
     def device(self):
         """ Device being used """
         return self.hyper_parameters.device
-
-    @property
-    def num_cells(self):
-        """ Number of cells in each layer / output dimension """
-        return self.hyper_parameters.num_cells
 
     @property
     def lr(self):
