@@ -28,7 +28,7 @@ class Hyperparameters:
 class DataCollection:
     """ Data collection parameters """
     frames_per_batch = 1000
-    total_frames = 20_000
+    total_frames = 10_000
 
 
 @dataclass
