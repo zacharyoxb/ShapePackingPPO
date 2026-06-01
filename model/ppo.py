@@ -181,7 +181,7 @@ class PPO:
                 self.save(logs, True)
 
             dataset_progress.set_description(
-                "Current Batch Progress  (" + ", ".join([cum_reward_str, lr_str]) + ")")
+                "Current Dataset Progress  (" + ", ".join([cum_reward_str, lr_str]) + ")")
 
         self.save(logs, False)
 
