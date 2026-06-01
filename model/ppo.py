@@ -1,6 +1,7 @@
 """ Code for the neural network itself. """
 
 from collections import defaultdict
+import random
 
 import torch
 from tqdm import tqdm
@@ -86,8 +87,106 @@ class PPO:
             self.optim.load_state_dict(best.optim_state)
             self.scheduler.load_state_dict(best.scheduler_state)
 
-    def train(self):
-        """ Train the model """
+    def train(self, td=None, logs=None):
+        """ Trains single set of data """
+
+        if logs is None:
+            logs = defaultdict(list)
+
+        if td is None:
+            td = random.choice(self.input_td)
+
+        env = PresentEnv.make_parallel_env(
+            start_state=td,
+            num_workers=self.config.num_workers,
+            device=torch.device("cpu")
+        )
+
+        collector = SyncDataCollector(
+            env,
+            self.policy_module,
+            frames_per_batch=self.config.frames_per_batch,
+            total_frames=self.config.total_frames,
+            # prevents linux CUDA permission err
+            device=torch.device("cpu"),
+            storing_device=torch.device("cpu"),
+            policy_device=self.training_device,
+        )
+
+        batch_progress = tqdm(
+            total=self.config.total_frames,
+            desc="Current Batch Progress",
+            position=1,
+            leave=False
+        )
+
+        # Collect data
+        for i, batch in enumerate(collector):
+            batch = batch.to(self.training_device)
+
+            # Learn from this batch
+            for _ in range(self.config.num_epochs):
+                # Compute advantages
+                self.advantage_module(batch)
+
+                # Split batch into minibatches
+                for minibatch in batch.split(self.config.sub_batch_size):
+
+                    loss_vals = self.loss_module(minibatch)
+
+                    loss = (
+                        loss_vals["loss_objective"]
+                        + loss_vals["loss_critic"]
+                        + loss_vals["loss_entropy"]
+                    )
+
+                    loss.backward()
+
+                    # Clip to prevent exploding gradients
+                    torch.nn.utils.clip_grad_norm_(
+                        self.loss_module.parameters(), self.config.max_grad_norm
+                    )
+
+                    self.optim.step()
+                    self.optim.zero_grad()
+
+                self.scheduler.step()
+
+            # Processed all epochs, log data
+            logs["reward"].append(
+                batch["next", "reward"].mean().item())
+            batch_progress.update(batch.numel())
+            cum_reward_str = (
+                f"average reward={logs['reward'][-1]: 4.2f}"
+            )
+            logs["lr"].append(self.optim.param_groups[0]["lr"])
+            lr_str = f"lr policy: {logs['lr'][-1]: 4.5f}"
+
+            # Every 10 batches, evaluate the policy
+            if i % 10 == 0:
+                with set_interaction_type(InteractionType.DETERMINISTIC), torch.no_grad():
+                    # execute a rollout with the trained policy
+                    env = PresentEnv.make_transformed_env(
+                        td, device=self.training_device)
+                    eval_rollout = env.rollout(1000, self.policy_module)
+                    logs["eval reward"].append(
+                        eval_rollout["next", "reward"].mean().item())
+                    logs["eval reward (sum)"].append(
+                        eval_rollout["next", "reward"].sum().item()
+                    )
+
+                    del eval_rollout
+
+            if i > 0 and i % 50 == 0:
+                self.save(logs, True)
+
+            batch_progress.set_description(
+                "Current Batch Progress  (" + ", ".join([cum_reward_str, lr_str]) + ")")
+
+        self.save(logs, False)
+
+    def train_all(self):
+        """ Train the model on all data """
         logs = defaultdict(list)
 
         overall_progress = tqdm(
@@ -95,98 +194,8 @@ class PPO:
 
         # for every set of data in the input
         for td in self.input_td:
-            env = PresentEnv.make_parallel_env(
-                start_state=td,
-                num_workers=self.config.num_workers,
-                device=torch.device("cpu")
-            )
-
-            collector = SyncDataCollector(
-                env,
-                self.policy_module,
-                frames_per_batch=self.config.frames_per_batch,
-                total_frames=self.config.total_frames,
-                # prevents linux CUDA permission err
-                device=torch.device("cpu"),
-                storing_device=torch.device("cpu"),
-                policy_device=self.training_device,
-            )
-
-            batch_progress = tqdm(
-                total=self.config.total_frames,
-                desc="Current Batch Progress",
-                position=1,
-                leave=False
-            )
-
-            # Collect data
-            for i, batch in enumerate(collector):
-                batch = batch.to(self.training_device)
-
-                # Learn from this batch
-                for _ in range(self.config.num_epochs):
-                    # Compute advantages
-                    self.advantage_module(batch)
-
-                    # Split batch into minibatches
-                    for minibatch in batch.split(self.config.sub_batch_size):
-
-                        loss_vals = self.loss_module(minibatch)
-
-                        loss = (
-                            loss_vals["loss_objective"]
-                            + loss_vals["loss_critic"]
-                            + loss_vals["loss_entropy"]
-                        )
-
-                        loss.backward()
-
-                        # Clip to prevent exploding gradients
-                        torch.nn.utils.clip_grad_norm_(
-                            self.loss_module.parameters(), self.config.max_grad_norm
-                        )
-
-                        self.optim.step()
-                        self.optim.zero_grad()
-
-                    self.scheduler.step()
-
-                # Processed all epochs, log data
-                logs["reward"].append(
-                    batch["next", "reward"].mean().item())
-                batch_progress.update(batch.numel())
-                cum_reward_str = (
-                    f"average reward={logs['reward'][-1]: 4.2f}"
-                )
-                logs["lr"].append(self.optim.param_groups[0]["lr"])
-                lr_str = f"lr policy: {logs['lr'][-1]: 4.5f}"
-
-                # Every 10 batches, evaluate the policy
-                if i % 10 == 0:
-                    with set_interaction_type(InteractionType.DETERMINISTIC), torch.no_grad():
-                        # execute a rollout with the trained policy
-                        env = PresentEnv.make_transformed_env(
-                            td, device=self.training_device)
-                        eval_rollout = env.rollout(1000, self.policy_module)
-                        logs["eval reward"].append(
-                            eval_rollout["next", "reward"].mean().item())
-                        logs["eval reward (sum)"].append(
-                            eval_rollout["next", "reward"].sum().item()
-                        )
-
-                        del eval_rollout
-
-                batch_progress.set_description(
-                    "Current Batch Progress  (" + ", ".join([cum_reward_str, lr_str]) + ")")
-
-            # display avg change in reward across all iterations
+            self.train(td, logs)
             overall_progress.update(1)
-            avg_change = torch.diff(torch.tensor(logs["reward"])).mean()
-            overall_progress.set_description(
-                f"Total Progress (Avg Reward Change {avg_change:+.4f})")
-
-            # checkpoint model now current data has been trained on
-            self.save(logs, True)
 
         # final save
         self.save(logs, False)

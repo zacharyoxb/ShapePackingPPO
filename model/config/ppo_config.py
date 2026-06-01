@@ -28,13 +28,13 @@ class Hyperparameters:
 class DataCollection:
     """ Data collection parameters """
     frames_per_batch = 1000
-    total_frames = 10_000
+    total_frames = 1_000_000
 
 
 @dataclass
 class PPOParameters:
     """ Loss function weights and coefficients """
-    sub_batch_size = 2048
+    sub_batch_size = 128
     num_epochs = 10
     clip_epsilon = (
         0.2

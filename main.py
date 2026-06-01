@@ -13,6 +13,7 @@ def main():
 
     module = PPO()
     module.train()
+    # module.train_all()
 
 
 if __name__ == "__main__":
