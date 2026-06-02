@@ -119,6 +119,9 @@ class PPO:
             position=1,
             leave=False
         )
+        dataset_metrics = tqdm(
+            total=0, position=2, bar_format='{desc}', desc=""
+        )
 
         # Collect data
         for i, batch in enumerate(collector):
@@ -188,9 +191,8 @@ class PPO:
             if i > 0 and i % 20 == 0:
                 self.save(logs, True)
 
-            dataset_progress.set_description(
-                "Current Dataset Progress  (" +
-                ", ".join([cum_reward_str, reward_change_str]) + ")"
+            dataset_metrics.set_description(
+                ", ".join([cum_reward_str, reward_change_str])
             )
 
         self.save(logs, False)
