@@ -152,15 +152,23 @@ class PPO:
 
                 self.scheduler.step()
 
-            # Processed all epochs, log data
+            # Log reward
             logs["reward"].append(
                 batch["next", "reward"].mean().item())
-            dataset_progress.update(batch.numel())
             cum_reward_str = (
-                f"average reward={logs['reward'][-1]: 4.2f}"
+                f"avg reward={logs['reward'][-1]: 4.2f}"
             )
-            logs["lr"].append(self.optim.param_groups[0]["lr"])
-            lr_str = f"lr policy: {logs['lr'][-1]: 4.5f}"
+
+            # Log avg reward change
+            if len(logs["reward"]) == 1:
+                reward_change = torch.tensor(0, dtype=torch.float32)
+            else:
+                reward_change = torch.diff(torch.tensor(logs["reward"]))
+            reward_change_str = (
+                f"avg reward change={reward_change.mean().item(): 4.5f}"
+            )
+
+            dataset_progress.update(batch.numel())
 
             # Every 10 batches, evaluate the policy
             if i % 10 == 0:
@@ -177,11 +185,13 @@ class PPO:
 
                     del eval_rollout
 
-            if i > 0 and i % 50 == 0:
+            if i > 0 and i % 20 == 0:
                 self.save(logs, True)
 
             dataset_progress.set_description(
-                "Current Dataset Progress  (" + ", ".join([cum_reward_str, lr_str]) + ")")
+                "Current Dataset Progress  (" +
+                ", ".join([cum_reward_str, reward_change_str]) + ")"
+            )
 
         self.save(logs, False)
 
