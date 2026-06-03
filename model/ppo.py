@@ -155,20 +155,18 @@ class PPO:
 
                 self.scheduler.step()
 
-            # Log reward
-            logs["reward"].append(
-                batch["next", "reward"].mean().item())
-            cum_reward_str = (
-                f"avg reward={logs['reward'][-1]: 4.2f}"
+            # Log best reward
+            logs["best_reward"].append(
+                torch.max(batch["next", "reward"])
             )
-
-            # Log avg reward change
-            if len(logs["reward"]) == 1:
-                reward_change = torch.tensor(0, dtype=torch.float32)
-            else:
-                reward_change = torch.diff(torch.tensor(logs["reward"]))
-            reward_change_str = (
-                f"avg reward change={reward_change.mean().item(): 4.5f}"
+            # Log avg reward
+            logs["avg_reward"].append(
+                batch["next", "reward"].mean().item())
+            best_reward_str = (
+                f"best_reward={logs['best_reward'][-1]: 4.2f}"
+            )
+            avg_reward_str = (
+                f"avg_reward={logs['avg_reward'][-1]: 4.2f}"
             )
 
             dataset_progress.update(batch.numel())
@@ -192,7 +190,7 @@ class PPO:
                 self.save(logs, True)
 
             dataset_metrics.set_description(
-                ", ".join([cum_reward_str, reward_change_str])
+                ", ".join([best_reward_str, avg_reward_str])
             )
 
         self.save(logs, False)
