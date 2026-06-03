@@ -220,7 +220,7 @@ class PPO:
         """
 
         data = ModelData(
-            logs['reward'][-1],
+            logs['best_reward'][-1],
             self.policy_module.state_dict(),
             self.value_module.state_dict(),
             self.loss_module.state_dict(),

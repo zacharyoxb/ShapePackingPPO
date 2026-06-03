@@ -138,7 +138,8 @@ class PresentEnv(EnvBase):
 
         # If there are any collisions, set reward to -20
         if torch.any(collision):
-            reward = torch.tensor(-20, dtype=torch.float32).unsqueeze(0)
+            punishment = -20 * torch.sum(collision)
+            reward = torch.tensor(punishment, dtype=torch.float32).unsqueeze(0)
             return grid, present_count, reward, done
 
         # Otherwise update state using action
