@@ -126,7 +126,7 @@ class PresentEnv(EnvBase):
             x_coord + 2 < w) & (y_coord + 2 < h)
 
         # Init reward and done values
-        reward = torch.tensor(-40, dtype=torch.float32).unsqueeze(0)
+        reward = torch.tensor(-200, dtype=torch.float32).unsqueeze(0)
         done = torch.tensor(True, dtype=torch.bool).unsqueeze(0)
 
         # If out of bounds, return as-is
@@ -136,7 +136,7 @@ class PresentEnv(EnvBase):
         grid_region = grid[:, y:y+3, x:x+3]
         collision = (present * grid_region) > 0
 
-        # If there are any collisions, set reward to -20
+        # If there are any collisions, set reward to -20 per collision
         if torch.any(collision):
             punishment = -20 * torch.sum(collision)
             reward = torch.tensor(punishment, dtype=torch.float32).unsqueeze(0)
