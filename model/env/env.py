@@ -133,8 +133,8 @@ class PresentEnv(EnvBase):
         if not in_bounds:
             return grid, present_count, reward, done
 
-        grid_region = grid[:, y:y+3, x:x+3]
-        collision = (present * grid_region) > 0
+        placement_area = grid[:, y:y+3, x:x+3]
+        collision = (present * placement_area) > 0
 
         # If there are any collisions, set reward to -20 per collision
         if torch.any(collision):
@@ -142,17 +142,28 @@ class PresentEnv(EnvBase):
             reward = torch.tensor(punishment, dtype=torch.float32).unsqueeze(0)
             return grid, present_count, reward, done
 
-        # Otherwise update state using action
-        present_idx = int(present_idx)
-        present_count[present_idx] -= 1
-        grid[:, y:y+3, x:x + 3] = torch.maximum(grid_region, present)
-
-        # For a valid placement give reward of 10
+        # For a valid placement give base reward of 10
         reward = torch.tensor(10, dtype=torch.float32).unsqueeze(0)
 
-        # If all presents are placed, give an extra 200 reward
+        # Give bonus for compact placement (check 5x5 area)
+        placement_region = grid[
+            :, max(0, y-1):min(h, y+4), max(0, x-1):min(w, x+4)
+        ]
+
+        # If there aren't 25 values, add 1s for each out of bounds area
+        multiplier = torch.sum(placement_region) + \
+            (25 - placement_region.numel())
+
+        reward *= multiplier
+
+        # Update state using action
+        present_idx = int(present_idx)
+        present_count[present_idx] -= 1
+        grid[:, y:y+3, x:x+3] = torch.maximum(placement_area, present)
+
+        # If all presents are placed, give an extra 1000 reward
         if torch.sum(present_count) == 0:
-            reward += 200
+            reward += 1000
         else:
             done = torch.tensor(False, dtype=torch.bool).unsqueeze(0)
 

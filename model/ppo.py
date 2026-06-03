@@ -208,9 +208,9 @@ class PPO:
             overall_progress.update(1)
 
         # final save
-        self.save(logs, False)
+        self.save(logs['best_reward'][-1], False)
 
-    def save(self, logs, is_checkpoint: bool):
+    def save(self, best_reward, is_checkpoint: bool):
         """
         Save the model, optimizer, and scheduler states.
 
@@ -220,7 +220,7 @@ class PPO:
         """
 
         data = ModelData(
-            logs['best_reward'][-1],
+            best_reward,
             self.policy_module.state_dict(),
             self.value_module.state_dict(),
             self.loss_module.state_dict(),
