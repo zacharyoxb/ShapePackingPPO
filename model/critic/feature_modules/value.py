@@ -60,30 +60,17 @@ class PresentValue(nn.Module):
 
     def forward(self, tensordict):
         """ Forward function for running of nn """
-        # predict value from grid and present count
         grid = tensordict.get("grid")
         present_count = tensordict.get("present_count")
 
-        # check for worker dim
-        original_shape = grid.shape
-        count_shape = present_count.shape
         if grid.dim() > 4:
-            grid = grid.view(-1, *original_shape[2:])
-            present_count = present_count.view(-1, *count_shape[2:])
+            grid_features = torch.vmap(self.grid_encoder)(grid)
+        else:
+            grid_features = self.grid_encoder(grid)
 
-        # put grid through CNN
-        grid_features = self.grid_encoder(grid)
-
-        # put grid features and present count together
         combined = torch.cat([grid_features, present_count], dim=-1)
 
-        # calculate value
         value = self.value_head(combined)
-
-        # if there was worker dim, add it again
-        if len(original_shape) > 4:
-            value = value.view(original_shape[0],
-                               original_shape[1], *value.shape[1:])
 
         batch_size = tensordict.batch_size[0] if tensordict.batch_size else 1
         return TensorDict({
