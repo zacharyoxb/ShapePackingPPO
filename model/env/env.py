@@ -143,7 +143,8 @@ class PresentEnv(EnvBase):
             return grid, present_count, reward, done
 
         # For a valid placement give base reward of 10
-        reward = torch.tensor(10, dtype=torch.float32).unsqueeze(0)
+        reward = torch.tensor(10, dtype=torch.float32,
+                              device=self.device).unsqueeze(0)
 
         # Give bonus for compact placement (check 5x5 area)
         placement_region = grid[

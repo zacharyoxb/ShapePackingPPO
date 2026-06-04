@@ -11,38 +11,21 @@ class GridExtractor(nn.Module):
         self.device = device
 
         self.encoder = nn.Sequential(
-            # Block 1: Local features
-            nn.Conv2d(1, 32, kernel_size=3, padding=1),
+            nn.Conv2d(1, 16, kernel_size=8, stride=4, padding=2),
+            nn.BatchNorm2d(16, track_running_stats=False),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+
+            nn.Conv2d(16, 32, kernel_size=5, stride=2, padding=2),
             nn.BatchNorm2d(32, track_running_stats=False),
             nn.ReLU(),
-            nn.Conv2d(32, 32, kernel_size=3, padding=1),
-            nn.BatchNorm2d(32, track_running_stats=False),
-            nn.ReLU(),
-            nn.MaxPool2d(2),  # HxW → H/2 x W/2
+            nn.MaxPool2d(2),
 
-            # Block 2: Medium features
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            nn.BatchNorm2d(64, track_running_stats=False),
-            nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=3, padding=1),
-            nn.BatchNorm2d(64, track_running_stats=False),
-            nn.ReLU(),
-            nn.MaxPool2d(2),  # → H/4 x W/4
-
-            # Block 3: Global features
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
-            nn.BatchNorm2d(128, track_running_stats=False),
-            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
             nn.AdaptiveAvgPool2d((4, 4)),
-
-            # Final projection
-            nn.Conv2d(128, 256, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(256, output_features, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten()
-        ).to(self.device)
+            nn.Flatten(),
+            nn.Linear(64 * 4 * 4, output_features)
+        ).to(device)
 
         self.features = 256
 

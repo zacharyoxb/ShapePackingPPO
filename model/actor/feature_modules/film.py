@@ -33,15 +33,12 @@ class FiLM(nn.Module):
         present_features: (B, feature_dim)
         """
 
-        # Generate FiLM parameters for this shape
         film_params = self.film_generator(
             present_features)  # [batch, hidden*2]
         gamma, beta = torch.chunk(film_params, 2, dim=-1)
 
-        # Apply FiLM modulation to grid features
         modulated_grid = gamma * grid_features + beta
 
-        # Score this shape given its modulated view of grid
         shape_score = self.scoring_net(modulated_grid)
 
         return shape_score, modulated_grid

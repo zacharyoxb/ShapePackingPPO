@@ -14,21 +14,18 @@ class PresentExtractor(nn.Module):
         self.output_features = output_features
 
         self.encoder = nn.Sequential(
-            # First conv: extract basic shape patterns
             nn.Conv2d(1, 16, kernel_size=2, padding=1),
-            nn.BatchNorm2d(16),
+            nn.BatchNorm2d(16, track_running_stats=False),
             nn.ReLU(),
 
-            # Second conv: combine local features
             nn.Conv2d(16, 32, kernel_size=3, padding=1),
-            nn.BatchNorm2d(32),
+            nn.BatchNorm2d(32, track_running_stats=False),
             nn.ReLU(),
 
-            # Flatten and project to desired size
             nn.Flatten(),
             nn.Linear(512, 128),
             nn.ReLU(),
-            nn.Linear(128, output_features)  # Final output size
+            nn.Linear(128, output_features)
         ).to(self.device)
 
     def forward(self, present):
