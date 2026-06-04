@@ -34,8 +34,8 @@ class DataCollection:
 @dataclass
 class PPOParameters:
     """ Loss function weights and coefficients """
-    sub_batch_size = 32
-    num_epochs = 5
+    sub_batch_size = 64
+    num_epochs = 10
     clip_epsilon = 0.2
     gamma = 0.99
     lmbda = 0.95
