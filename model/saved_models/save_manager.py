@@ -78,10 +78,13 @@ class ModelSaveManager:
             return None
 
         # get best model / checkpoint
+        all_models = []
         if self.models:
-            best_model = max(self.models)
-        else:
-            best_model = max(self.ckpts)
+            all_models.extend(self.models)
+        if self.ckpts:
+            all_models.extend(self.ckpts)
+
+        best_model = max(all_models)
 
         return best_model.get_data()
 
@@ -95,12 +98,14 @@ class ModelSaveManager:
             return None
 
         # get most recent model/checkpoint
+        all_models = []
         if self.models:
-            most_recent = max(
-                self.models, key=lambda model: model.get_save_time())
-        else:
-            most_recent = max(
-                self.ckpts, key=lambda model: model.get_save_time())
+            all_models.extend(self.models)
+        if self.ckpts:
+            all_models.extend(self.ckpts)
+
+        most_recent = max(
+            all_models, key=lambda model: model.get_save_time())
 
         return most_recent.get_data()
 
