@@ -36,8 +36,7 @@ class PresentSelectionActor(nn.Module):
                 # add batch, channel dim
                 orient = orient.unsqueeze(0).unsqueeze(0)
                 features = self.present_extractor(orient)
-                # delete graph history before appending
-                orient_features.append(features.detach())
+                orient_features.append(features)
 
             present_features = torch.stack(orient_features)
             all_features.append(present_features)
