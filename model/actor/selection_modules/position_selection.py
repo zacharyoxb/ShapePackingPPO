@@ -14,7 +14,8 @@ class PresentPositionActor(nn.Module):
         super().__init__()
 
         # Presents shouldn't be learnable/modifiable nor in state_dict
-        self.register_buffer("presents", presents, persistent=False)
+        self.register_buffer("presents", torch.tensor([]), persistent=False)
+        self.presents = presents
         self.device = device
         self.input_features = grid_features + present_features
 
@@ -86,11 +87,11 @@ class PresentPositionActor(nn.Module):
 
         # get present for partial action output
         if present_idx.numel() < 2:
-            present = self.presents[  # type: ignore
+            present = self.presents[
                 present_idx.item(), orient_idx.item(), :, :
             ].unsqueeze(0)
         else:
-            present = self.presents[  # type: ignore
+            present = self.presents[
                 present_idx.tolist(), orient_idx.tolist(), :, :
             ]
 
