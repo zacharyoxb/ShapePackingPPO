@@ -20,19 +20,17 @@ class PresentSelectionActor(nn.Module):
         self.device = device
 
         # Presents shouldn't be learnable/modifiable nor in state_dict
-        self.register_buffer("all_present_features",
-                             torch.tensor([]), persistent=False)
+        self.register_buffer("presents", torch.tensor([]), persistent=False)
+        self.presents = presents
 
         self.grid_extractor = GridExtractor(device)
         self.present_extractor = PresentExtractor(device)
         self.film = FiLM(device)
 
-        self._feature_init(presents)
-
-    def _feature_init(self, presents):
+    def _extract_present_feats(self):
         all_features = []
 
-        for present in presents:
+        for present in self.presents:
             orient_features = []
             for orient in present:
                 # add batch, channel dim
@@ -44,7 +42,7 @@ class PresentSelectionActor(nn.Module):
             present_features = torch.stack(orient_features)
             all_features.append(present_features)
 
-        self.all_present_features = torch.stack(all_features)
+        return torch.stack(all_features)
 
     # Returns with dims [BATCH] [ORIENTATION DIM] [SINGLETON DIM]
     def _process_present_orients(self, grid_features, present_feat, p_idx):
@@ -103,8 +101,11 @@ class PresentSelectionActor(nn.Module):
         all_logits = []
         all_orient_tds = []
 
+        # get present features
+        all_present_features = self._extract_present_feats()
+
         # Mask out unavailable presents
-        for p_idx, present_feat in enumerate(self.all_present_features):
+        for p_idx, present_feat in enumerate(all_present_features):
             # Skip iteration if present is placed in all dims
             mask = present_count[..., p_idx] == 0
 
